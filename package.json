@@ -1,0 +1,9 @@
+{
+  "name": "ostenty-catalogo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Catálogo digital OSTENTY SEMIJOIAS com API serverless e MongoDB.",
+  "dependencies": {
+    "mongodb": "^6.18.0"
+  }
+}

@@ -1,6 +1,7 @@
 const CATEGORIES = ["Colares", "Brincos", "Argolas", "Anéis", "Conjuntos", "Pingentes", "Pulseiras"];
 const STORAGE_KEY = "ostenty_catalog_products_v1";
 const SESSION_KEY = "ostenty_admin_session_v1";
+const API_BASE = "/api";
 
 const state = {
   products: loadProducts(),
@@ -21,6 +22,24 @@ function loadProducts() {
 
 function saveProducts() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.products));
+}
+
+async function apiRequest(path, options = {}) {
+  const response = await fetch(`${API_BASE}${path}`, { credentials: "include", headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `Falha na API (${response.status}).`);
+  return payload;
+}
+
+async function tryApi(path, options = {}) {
+  try { return await apiRequest(path, options); } catch (error) { console.warn("OSTENTY API:", error.message); return null; }
+}
+
+async function refreshProductsFromApi() {
+  const query = isAdmin() ? "?includeInactive=1" : "";
+  const result = await tryApi(`/products${query}`);
+  if (result?.products) { state.products = result.products; saveProducts(); renderCatalog(); if (isAdmin()) renderAdmin(); }
+  return result;
 }
 
 function uid() { return `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`; }
@@ -174,15 +193,15 @@ function buildPrintCatalog() {
   window.print();
 }
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
   const target = event.target.closest("[data-view-product], [data-select-product], [data-catalog-category], [data-edit-product], [data-delete-product], [data-toggle-product], [data-close-modal]");
   if (!target) return;
   if (target.matches("[data-catalog-category]")) { state.catalogCategory = target.dataset.catalogCategory; renderCatalog(); return; }
   if (target.matches("[data-select-product]")) { const id = target.dataset.selectProduct; state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id); renderCatalog(); return; }
   if (target.matches("[data-view-product]")) { openProductDetail(state.products.find((product) => product.id === target.dataset.viewProduct)); return; }
   if (target.matches("[data-edit-product]")) { openProductModal(state.products.find((product) => product.id === target.dataset.editProduct)); return; }
-  if (target.matches("[data-toggle-product]")) { const product = state.products.find((item) => item.id === target.dataset.toggleProduct); if (product) { product.status = product.status === "active" ? "inactive" : "active"; saveProducts(); renderAdmin(); showToast(product.status === "active" ? "Produto ativado." : "Produto ocultado do catálogo."); } return; }
-  if (target.matches("[data-delete-product]")) { const product = state.products.find((item) => item.id === target.dataset.deleteProduct); if (product && window.confirm(`Excluir “${product.name}”?`)) { state.products = state.products.filter((item) => item.id !== product.id); state.selected.delete(product.id); saveProducts(); renderAdmin(); showToast("Produto excluído."); } return; }
+  if (target.matches("[data-toggle-product]")) { const product = state.products.find((item) => item.id === target.dataset.toggleProduct); if (product) { const nextStatus = product.status === "active" ? "inactive" : "active"; const result = await tryApi(`/products?id=${encodeURIComponent(product.id)}`, { method: "PUT", body: JSON.stringify({ ...product, status: nextStatus }) }); product.status = result?.product?.status || nextStatus; saveProducts(); renderAdmin(); renderCatalog(); showToast(product.status === "active" ? "Produto ativado." : "Produto ocultado do catálogo."); } return; }
+  if (target.matches("[data-delete-product]")) { const product = state.products.find((item) => item.id === target.dataset.deleteProduct); if (product && window.confirm(`Excluir “${product.name}”?`)) { await tryApi(`/products?id=${encodeURIComponent(product.id)}`, { method: "DELETE" }); state.products = state.products.filter((item) => item.id !== product.id); state.selected.delete(product.id); saveProducts(); renderAdmin(); renderCatalog(); showToast("Produto excluído."); } return; }
   if (target.matches("[data-close-modal]")) closeModals();
 });
 
@@ -193,14 +212,14 @@ $("#adminSearch").addEventListener("input", renderAdmin);
 $("#adminCategoryFilter").addEventListener("change", (event) => { state.adminCategory = event.target.value; renderAdmin(); });
 $("#openProductButton").addEventListener("click", () => openProductModal());
 $("#openImportButton").addEventListener("click", () => { state.importRows = []; state.importedImages = {}; $("#csvInput").value = ""; $("#imageFolderInput").value = ""; renderImportPreview(); $("#importModal").classList.remove("hidden"); });
-$("#logoutButton").addEventListener("click", () => { localStorage.removeItem(SESSION_KEY); renderAdmin(); showToast("Sessão encerrada."); });
-$("#loginForm").addEventListener("submit", (event) => { event.preventDefault(); if ($( "#loginPassword").value.length < 4) { showToast("A senha precisa ter pelo menos 4 caracteres."); return; } localStorage.setItem(SESSION_KEY, "true"); renderAdmin(); showToast("Acesso liberado."); });
-$("#productForm").addEventListener("submit", async (event) => { event.preventDefault(); const id = $("#productId").value || uid(); const existing = state.products.find((product) => product.id === id); const code = $("#productCode").value.trim(); if (state.products.some((product) => product.code.toLowerCase() === code.toLowerCase() && product.id !== id)) { showToast("Esse código já está cadastrado."); return; } let image = existing?.image || ""; const file = $("#productImage").files[0]; if (file) image = await readFileAsDataUrl(file); const product = { id, code, name: $("#productName").value.trim(), description: $("#productDescription").value.trim(), price: normalizePrice($("#productPrice").value), category: $("#productCategory").value, status: $("#productStatus").value, image, additionalImages: $("#productAdditionalImages").value.split("\n").map((item) => item.trim()).filter(Boolean) }; if (existing) state.products = state.products.map((item) => item.id === id ? product : item); else state.products.push(product); saveProducts(); closeModals(); renderAdmin(); renderCatalog(); showToast(existing ? "Produto atualizado." : "Produto cadastrado."); });
+$("#logoutButton").addEventListener("click", async () => { await tryApi("/auth?action=logout", { method: "POST" }); localStorage.removeItem(SESSION_KEY); renderAdmin(); showToast("Sessão encerrada."); });
+$("#loginForm").addEventListener("submit", async (event) => { event.preventDefault(); if ($("#loginPassword").value.length < 4) { showToast("A senha precisa ter pelo menos 4 caracteres."); return; } try { await apiRequest("/auth", { method: "POST", body: JSON.stringify({ email: $("#loginEmail").value.trim(), password: $("#loginPassword").value }) }); localStorage.setItem(SESSION_KEY, "true"); await refreshProductsFromApi(); renderAdmin(); showToast("Acesso liberado."); } catch (error) { showToast(error.message); } });
+$("#productForm").addEventListener("submit", async (event) => { event.preventDefault(); const id = $("#productId").value || uid(); const existing = state.products.find((product) => product.id === id); const code = $("#productCode").value.trim(); if (state.products.some((product) => product.code.toLowerCase() === code.toLowerCase() && product.id !== id)) { showToast("Esse código já está cadastrado."); return; } let image = existing?.image || ""; const file = $("#productImage").files[0]; if (file) image = await readFileAsDataUrl(file); const product = { id, code, name: $("#productName").value.trim(), description: $("#productDescription").value.trim(), price: normalizePrice($("#productPrice").value), category: $("#productCategory").value, status: $("#productStatus").value, image, additionalImages: $("#productAdditionalImages").value.split("\n").map((item) => item.trim()).filter(Boolean) }; const result = await tryApi(existing ? `/products?id=${encodeURIComponent(id)}` : "/products", { method: existing ? "PUT" : "POST", body: JSON.stringify(product) }); const savedProduct = result?.product || product; if (existing) state.products = state.products.map((item) => item.id === id ? savedProduct : item); else state.products.push(savedProduct); saveProducts(); closeModals(); renderAdmin(); renderCatalog(); showToast(existing ? "Produto atualizado." : "Produto cadastrado."); });
 $("#csvInput").addEventListener("change", async (event) => { const file = event.target.files[0]; if (!file) return; const rows = parseCsv(await file.text()); const seenCodes = new Set(); state.importRows = rows.map((raw, index) => { const row = mapImportRow(raw, index); const normalizedCode = row.code.toLowerCase(); if (normalizedCode && seenCodes.has(normalizedCode)) { row.duplicate = true; row.valid = false; row.issue = "Código duplicado na planilha"; } if (normalizedCode) seenCodes.add(normalizedCode); return row; }); renderImportPreview(); });
 $("#imageFolderInput").addEventListener("change", async (event) => { const files = [...event.target.files]; state.importedImages = {}; await Promise.all(files.map(async (file) => { const name = file.name.replace(/\.[^.]+$/, "").toLowerCase(); state.importedImages[name] = await readFileAsDataUrl(file); })); showToast(`${files.length} foto(s) relacionada(s) à importação.`); });
-$("#confirmImportButton").addEventListener("click", () => { const validRows = state.importRows.filter((row) => row.valid); validRows.forEach((row) => { const folderImage = state.importedImages[row.code.toLowerCase()] || ""; state.products.push({ id: uid(), code: row.code, name: row.name, description: row.description, price: row.price, category: row.category, status: row.status, image: row.image || folderImage, additionalImages: [] }); }); saveProducts(); closeModals(); renderAdmin(); renderCatalog(); showToast(`${validRows.length} produto(s) importado(s).`); });
+$("#confirmImportButton").addEventListener("click", async () => { const validRows = state.importRows.filter((row) => row.valid).map((row) => ({ id: uid(), code: row.code, name: row.name, description: row.description, price: row.price, category: row.category, status: row.status, image: row.image || state.importedImages[row.code.toLowerCase()] || "", additionalImages: [] })); const result = await tryApi("/import", { method: "POST", body: JSON.stringify(validRows) }); const imported = result?.products || validRows; imported.forEach((product) => state.products.push(product)); saveProducts(); closeModals(); renderAdmin(); renderCatalog(); showToast(`${result?.imported ?? imported.length} produto(s) importado(s).`); });
 $("#shareSelectionButton").addEventListener("click", () => { const products = state.products.filter((product) => state.selected.has(product.id)); if (!products.length) { showToast("Selecione pelo menos uma peça para compartilhar."); return; } const message = `Olá! Gostaria de saber mais sobre estas peças OSTENTY:%0A%0A${products.map((product) => `• ${product.name} — código ${product.code}`).join("%0A")}`; window.open(`https://wa.me/?text=${message}`, "_blank", "noopener"); });
 $("#modalSelectButton").addEventListener("click", () => { const id = $("#modalSelectButton").dataset.productId; state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id); openProductDetail(state.products.find((product) => product.id === id)); renderCatalog(); });
 $("#generatePdfButton").addEventListener("click", buildPrintCatalog);
 
-renderCategoryFilters(); routeFromHash();
+renderCategoryFilters(); routeFromHash(); refreshProductsFromApi();
