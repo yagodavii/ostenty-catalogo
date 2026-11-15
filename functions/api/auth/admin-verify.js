@@ -14,7 +14,7 @@ export async function onRequestGet({ request, env }) {
   if (verifiedEmail !== session.email) return json({ error: "O e-mail confirmado no Cloudflare Access não corresponde à conta conectada." }, 403);
 
   await env.DB.prepare("UPDATE admin_users SET is_admin = 1 WHERE email = ?").bind(session.email).run();
-  const next = new URL(request.url).searchParams.get("next") || "/#admin";
-  const safePath = next.startsWith("/") && !next.startsWith("//") ? next : "/#admin";
+  const next = new URL(request.url).searchParams.get("next") || "/#inicio";
+  const safePath = next.startsWith("/") && !next.startsWith("//") ? next : "/#inicio";
   return Response.redirect(new URL(safePath, request.url).toString(), 302);
 }

@@ -103,7 +103,7 @@ function updateNavigation() {
 }
 
 function beginAdminEmailVerification() {
-  const next = encodeURIComponent("/?admin_access=verified#admin");
+  const next = encodeURIComponent("/?admin_access=verified#inicio");
   window.location.assign(`/api/auth/admin-verify?next=${next}`);
 }
 
@@ -159,9 +159,8 @@ function completeAuthentication(result) {
   state.adminRole = Boolean(result.isAdmin);
   state.authStatus = "authenticated";
   updateNavigation();
-  const view = isAdmin() ? "admin" : "landing";
-  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${view === "admin" ? "admin" : "inicio"}`);
-  setView(view);
+  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#inicio`);
+  setView("landing");
 }
 
 function setView(view) {
