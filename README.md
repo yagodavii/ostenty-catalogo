@@ -32,7 +32,7 @@ O painel usa Cloudflare Pages Functions e D1 para restringir a autenticação ao
 
 1. Em **Workers & Pages → D1 SQL Database**, crie um banco chamado `ostenty-admin-auth`.
 2. No projeto Pages, abra **Settings → Functions → D1 database bindings**, adicione o banco criado com o nome de variável `DB` e salve.
-3. No console do D1, execute o conteúdo de `migrations/0001_admin_auth.sql`.
+3. No console do D1, execute o conteúdo de `migrations/0001_admin_auth.sql` e, se já havia criado as tabelas, execute também `migrations/0002_admin_user_name.sql`.
 4. Em **Settings → Environment variables**, crie `ADMIN_TEMP_PASSWORD` como secret com a senha temporária que será compartilhada apenas com os três administradores.
 5. Aguarde um novo deploy do Pages. No primeiro acesso, cada administrador entra ou cria o acesso usando o e-mail autorizado e a senha temporária; o sistema exige a troca por uma senha própria.
 

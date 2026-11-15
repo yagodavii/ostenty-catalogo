@@ -81,13 +81,13 @@ export async function getSession(request, env) {
   if (!token) return null;
   const hash = await tokenHash(token);
   const session = await env.DB.prepare(
-    "SELECT s.email, s.expires_at, u.must_change FROM admin_sessions s JOIN admin_users u ON u.email = s.email WHERE s.token_hash = ?",
+    "SELECT s.email, s.expires_at, u.name, u.must_change FROM admin_sessions s JOIN admin_users u ON u.email = s.email WHERE s.token_hash = ?",
   ).bind(hash).first();
   if (!session || session.expires_at <= Math.floor(Date.now() / 1000)) {
     if (session) await env.DB.prepare("DELETE FROM admin_sessions WHERE token_hash = ?").bind(hash).run();
     return null;
   }
-  return { email: session.email, mustChangePassword: Boolean(session.must_change), tokenHash: hash };
+  return { email: session.email, name: session.name || "", mustChangePassword: Boolean(session.must_change) || !session.name, tokenHash: hash };
 }
 
 export function clearSessionCookie() {

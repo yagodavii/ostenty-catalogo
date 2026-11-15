@@ -18,6 +18,7 @@ const state = {
   photoReplaceIndex: null,
   adminAuthenticated: false,
   adminEmail: "",
+  adminName: "",
   authStatus: "unknown",
 };
 
@@ -78,10 +79,12 @@ function renderAuthView(view, message = "") {
   Object.entries(views).forEach(([key, selector]) => $(selector).classList.toggle("hidden", key !== view));
   $("#adminAuthPanel").classList.remove("hidden");
   $("#adminPanel").classList.add("hidden");
+  document.body.classList.remove("admin-authenticated");
   if (view === "login") $("#authLoginMessage").textContent = message;
   if (view === "register") $("#authRegisterMessage").textContent = message;
   if (view === "change") $("#authChangePasswordMessage").textContent = message;
   if (view === "unavailable") $("#authUnavailableMessage").textContent = message;
+  if (view === "change") $("#adminName").value = state.adminName;
 }
 
 async function refreshAdminSession() {
@@ -94,12 +97,14 @@ async function refreshAdminSession() {
     if (!result.authenticated) {
       state.adminAuthenticated = false;
       state.adminEmail = "";
+      state.adminName = "";
       state.authStatus = "signed-out";
       renderAuthView("login");
       return;
     }
     state.adminAuthenticated = true;
     state.adminEmail = result.email;
+    state.adminName = result.name || "";
     state.authStatus = result.mustChangePassword ? "must-change" : "authenticated";
     if (result.mustChangePassword) renderAuthView("change");
     else renderAdmin();
@@ -125,6 +130,7 @@ async function postAuth(path, payload = {}) {
 function completeAuthentication(result) {
   state.adminAuthenticated = true;
   state.adminEmail = result.email;
+  state.adminName = result.name || "";
   state.authStatus = result.mustChangePassword ? "must-change" : "authenticated";
   if (result.mustChangePassword) renderAuthView("change");
   else renderAdmin();
@@ -210,9 +216,12 @@ function renderCatalog() {
 }
 
 function renderAdmin() {
-  $("#adminPanel").classList.toggle("hidden", !isAdmin());
-  $("#adminAuthPanel").classList.toggle("hidden", isAdmin());
+  const authorized = isAdmin();
+  document.body.classList.toggle("admin-authenticated", authorized);
+  $("#adminPanel").classList.toggle("hidden", !authorized);
+  $("#adminAuthPanel").classList.toggle("hidden", authorized);
   if (!isAdmin()) return;
+  $("#adminGreeting").textContent = `Olá, ${state.adminName || state.adminEmail.split("@")[0]}.`;
   renderCategoryFilters();
   const products = state.products.filter((product) => (state.adminCategory === "all" || product.category === state.adminCategory) && (!state.adminSearchQuery || matchesSearch(product, state.adminSearchQuery)));
   $("#statActive").textContent = state.products.filter((product) => product.status === "active").length;
@@ -616,6 +625,7 @@ document.addEventListener("click", async (event) => {
   try { await postAuth("/api/auth/logout"); } catch { /* The session cookie is still cleared locally below. */ }
   state.adminAuthenticated = false;
   state.adminEmail = "";
+  state.adminName = "";
   state.authStatus = "signed-out";
   renderAuthView("login");
 });
@@ -635,7 +645,7 @@ $("#adminRegisterForm").addEventListener("submit", async (event) => {
   const message = $("#authRegisterMessage");
   message.textContent = "Ativando acesso…";
   try {
-    const result = await postAuth("/api/auth/register", { email: $("#registerEmail").value, password: $("#registerPassword").value });
+    const result = await postAuth("/api/auth/register", { email: $("#registerEmail").value, name: $("#registerName").value, password: $("#registerPassword").value });
     completeAuthentication(result);
   } catch (error) { message.textContent = error.message; }
 });
@@ -647,7 +657,9 @@ $("#adminChangePasswordForm").addEventListener("submit", async (event) => {
   if (password !== $("#confirmNewPassword").value) { message.textContent = "As senhas não coincidem."; return; }
   message.textContent = "Salvando nova senha…";
   try {
-    const result = await postAuth("/api/auth/change-password", { password });
+    const name = $("#adminName").value.trim();
+    if (name.length < 2) { message.textContent = "Informe seu nome para o painel."; return; }
+    const result = await postAuth("/api/auth/change-password", { password, name });
     $("#newPassword").value = "";
     $("#confirmNewPassword").value = "";
     completeAuthentication(result);
