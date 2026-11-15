@@ -1,0 +1,8 @@
+[build]
+  command = "echo 'Static site ready'"
+  publish = "."
+
+[[redirects]]
+  from = "/"
+  to = "/frontend/index.html"
+  status = 200
