@@ -52,7 +52,9 @@ function uid() { return `p_${Date.now()}_${Math.random().toString(36).slice(2, 8
 function escapeHtml(value = "") { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char])); }
 function formatPrice(value) {
   if (value === null || value === undefined || value === "") return "Preço sob consulta";
-  const number = Number(String(value).replace(/[^0-9,.-]/g, "").replace(".", "").replace(",", "."));
+  const text = String(value).trim().replace(/R\$\s?/i, "");
+  const normalized = text.includes(",") ? text.replace(/\./g, "").replace(",", ".") : text;
+  const number = Number(normalized.replace(/[^0-9.-]/g, ""));
   if (!Number.isFinite(number)) return "Preço sob consulta";
   return number.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
