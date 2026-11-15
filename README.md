@@ -1,80 +1,21 @@
 # OSTENTY SEMIJOIAS — Catálogo digital
 
-Catálogo digital responsivo com frontend estático, API serverless na Vercel e persistência em MongoDB Atlas.
+Catálogo digital responsivo com painel administrativo aberto e armazenamento local no navegador (`localStorage`). Não requer banco de dados nem credenciais de administrador.
 
 ## Estrutura
 
-```text
-frontend/                 landing, catálogo e painel administrativo
-  index.html
-  styles.css
-  app.js
-backend/                  regras de negócio e acesso ao banco
-  api/                    handlers de autenticação, produtos e importação
-  lib/                    MongoDB, sessão e utilitários
-api/                      entradas serverless reconhecidas pela Vercel
-vercel.json               rewrite da página pública para frontend/
-.env.example              variáveis necessárias em desenvolvimento/Vercel
-```
-
-## Banco e autenticação
-
-O backend usa MongoDB Atlas. Configure no Vercel (Project → Settings → Environment Variables) ou em um arquivo local `.env.local`:
-
-```text
-MONGODB_URI=mongodb+srv://...
-MONGODB_DB=ostenty
-ADMIN_EMAIL=admin@ostenty.com.br
-ADMIN_PASSWORD=uma-senha-forte
-SESSION_SECRET=uma-chave-longa-e-aleatoria
-```
-
-Nunca envie `.env.local` ou valores reais para o GitHub. O arquivo `.env.example` contém apenas o formato.
-
-## API disponível
-
-- `GET /api/health`
-- `GET /api/categories`
-- `GET /api/products` — produtos ativos para o catálogo público
-- `GET /api/products?includeInactive=1` — inventário completo para sessão autenticada
-- `POST /api/auth` — login
-- `POST /api/auth?action=logout` — logout
-- `POST /api/products` — cadastrar produto autenticado
-- `PUT /api/products?id=...` — editar produto autenticado
-- `DELETE /api/products?id=...` — excluir produto autenticado
-- `POST /api/import` — importação em massa autenticada
-- `GET /api/stats` — métricas autenticadas
-
-## Catálogos em PDF
-
-No painel administrativo, a área **Gerar catálogos** oferece:
-
-- PDF completo com todos os produtos ativos, agrupados por categoria.
-- PDFs separados por categoria, respeitando as categorias marcadas.
-- PDF individual de cada peça pelo botão `PDF` na linha do produto.
-
-Cada saída abre uma janela de impressão com o layout OSTENTY. Escolha **Salvar como PDF** no diálogo do navegador. Os dados são lidos do inventário atual no momento da geração.
-
-## Gestão de fotos
-
-Somente a sessão autenticada do ADM vê o botão **Fotos** na tabela de produtos. O gerenciador permite:
-
-- Adicionar uma ou várias imagens com pré-visualização antes de salvar.
-- Substituir qualquer imagem individual.
-- Excluir imagens.
-- Definir a foto principal, usada no card do catálogo e nos PDFs.
-
-As alterações são salvas no mesmo produto pela API protegida e aparecem automaticamente no catálogo público e nas próximas gerações de PDF. Visitantes públicos não recebem os controles administrativos.
+- `frontend/`: catálogo público e painel administrativo
+- `backend/` e `api/`: handlers originalmente preparados para Vercel
 
 ## Desenvolvimento
 
-```powershell
+```sh
 npm install
-vercel dev
+node /workspace/.ostenty-tools/dev.cjs
 ```
 
-Sem as variáveis MongoDB, o frontend continua funcionando em modo local para testes, usando `localStorage`. Em produção, configure o MongoDB antes de cadastrar produtos para que os dados sejam compartilhados entre dispositivos.
+Abra o site servido na porta 3000. Acesse **Administração** para cadastrar, editar, importar e remover produtos. Os dados permanecem no navegador e não são sincronizados entre dispositivos. Limpar os dados do navegador também apaga o catálogo salvo nele.
 
-## Deploy
+## PDFs
 
-O projeto está preparado para Vercel. Depois de conectar o repositório GitHub ao projeto Vercel, cada push na branch `main` gera um novo deploy automaticamente.
+No painel, gere catálogos completos ou separados por categoria. O navegador abre a janela de impressão; escolha **Salvar como PDF**.

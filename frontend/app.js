@@ -15,7 +15,7 @@ const state = {
   photoDraft: [],
   photoPrimaryUrl: "",
   photoReplaceIndex: null,
-  adminAuthenticated: false,
+  adminAuthenticated: true,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -65,20 +65,9 @@ function showToast(message) {
   toast.textContent = message; toast.classList.add("show");
   window.clearTimeout(showToast.timer); showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2800);
 }
-function isAdmin() { return state.adminAuthenticated === true; }
+function isAdmin() { return true; }
 
-async function restoreAdminSession() {
-  try {
-    const result = await apiRequest("/auth");
-    state.adminAuthenticated = Boolean(result.authenticated);
-  } catch {
-    state.adminAuthenticated = false;
-  }
-  if (window.location.hash === "#admin") {
-    await refreshProductsFromApi();
-    renderAdmin();
-  }
-}
+async function restoreAdminSession() { state.adminAuthenticated = true; renderAdmin(); }
 
 function setView(view) {
   const views = { landing: "#landingView", catalog: "#catalogView", admin: "#adminView" };
@@ -348,8 +337,7 @@ $("#openProductButton").addEventListener("click", () => openProductModal());
 $("#openImportButton").addEventListener("click", () => { state.importRows = []; state.importedImages = {}; $("#csvInput").value = ""; $("#imageFolderInput").value = ""; renderImportPreview(); $("#importModal").classList.remove("hidden"); });
 $("#photoAddInput").addEventListener("change", async (event) => { const files = [...event.target.files]; if (state.photoReplaceIndex !== null) await replacePhotoFile(files[0]); else await addPhotoFiles(files); event.target.value = ""; event.target.multiple = true; });
 $("#savePhotosButton").addEventListener("click", saveManagedPhotos);
-$("#logoutButton").addEventListener("click", async () => { await tryApi("/auth?action=logout", { method: "POST" }); state.adminAuthenticated = false; localStorage.removeItem(SESSION_KEY); renderAdmin(); showToast("Sessão encerrada."); });
-$("#loginForm").addEventListener("submit", async (event) => { event.preventDefault(); if ($("#loginPassword").value.length < 4) { showToast("A senha precisa ter pelo menos 4 caracteres."); return; } try { await apiRequest("/auth", { method: "POST", body: JSON.stringify({ email: $("#loginEmail").value.trim(), password: $("#loginPassword").value }) }); state.adminAuthenticated = true; localStorage.setItem(SESSION_KEY, "true"); await refreshProductsFromApi(); renderAdmin(); showToast("Acesso liberado."); } catch (error) { state.adminAuthenticated = false; showToast(error.message); } });
+
 $("#productForm").addEventListener("submit", async (event) => { event.preventDefault(); const id = $("#productId").value || uid(); const existing = state.products.find((product) => product.id === id); const code = $("#productCode").value.trim(); if (state.products.some((product) => product.code.toLowerCase() === code.toLowerCase() && product.id !== id)) { showToast("Esse código já está cadastrado."); return; } let image = existing?.image || ""; const file = $("#productImage").files[0]; if (file) image = await readFileAsDataUrl(file); const product = { id, code, name: $("#productName").value.trim(), description: $("#productDescription").value.trim(), price: normalizePrice($("#productPrice").value), category: $("#productCategory").value, status: $("#productStatus").value, image, additionalImages: $("#productAdditionalImages").value.split("\n").map((item) => item.trim()).filter(Boolean) }; const result = await tryApi(existing ? `/products?id=${encodeURIComponent(id)}` : "/products", { method: existing ? "PUT" : "POST", body: JSON.stringify(product) }); const savedProduct = result?.product || product; if (existing) state.products = state.products.map((item) => item.id === id ? savedProduct : item); else state.products.push(savedProduct); saveProducts(); closeModals(); renderAdmin(); renderCatalog(); showToast(existing ? "Produto atualizado." : "Produto cadastrado."); });
 $("#csvInput").addEventListener("change", async (event) => { const file = event.target.files[0]; if (!file) return; const rows = parseCsv(await file.text()); const seenCodes = new Set(); state.importRows = rows.map((raw, index) => { const row = mapImportRow(raw, index); const normalizedCode = row.code.toLowerCase(); if (normalizedCode && seenCodes.has(normalizedCode)) { row.duplicate = true; row.valid = false; row.issue = "Código duplicado na planilha"; } if (normalizedCode) seenCodes.add(normalizedCode); return row; }); renderImportPreview(); });
 $("#imageFolderInput").addEventListener("change", async (event) => { const files = [...event.target.files]; state.importedImages = {}; await Promise.all(files.map(async (file) => { const name = file.name.replace(/\.[^.]+$/, "").toLowerCase(); state.importedImages[name] = await readFileAsDataUrl(file); })); showToast(`${files.length} foto(s) relacionada(s) à importação.`); });
@@ -359,4 +347,4 @@ $("#modalSelectButton").addEventListener("click", () => { const id = $("#modalSe
 $("#generatePdfButton").addEventListener("click", buildPrintCatalog);
 $("#generateCategoryPdfButton").addEventListener("click", buildCategoryPrintCatalogs);
 
-renderCategoryFilters(); routeFromHash(); refreshProductsFromApi(); restoreAdminSession();
+renderCategoryFilters(); routeFromHash(); renderAdmin();
