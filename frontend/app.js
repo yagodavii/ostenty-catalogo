@@ -123,7 +123,6 @@ function renderCatalog() {
 }
 
 function renderAdmin() {
-  $("#loginPanel").classList.toggle("hidden", isAdmin());
   $("#adminPanel").classList.toggle("hidden", !isAdmin());
   if (!isAdmin()) return;
   renderCategoryFilters();
