@@ -45,6 +45,16 @@ Nunca envie `.env.local` ou valores reais para o GitHub. O arquivo `.env.example
 - `POST /api/import` — importação em massa autenticada
 - `GET /api/stats` — métricas autenticadas
 
+## Catálogos em PDF
+
+No painel administrativo, a área **Gerar catálogos** oferece:
+
+- PDF completo com todos os produtos ativos, agrupados por categoria.
+- PDFs separados por categoria, respeitando as categorias marcadas.
+- PDF individual de cada peça pelo botão `PDF` na linha do produto.
+
+Cada saída abre uma janela de impressão com o layout OSTENTY. Escolha **Salvar como PDF** no diálogo do navegador. Os dados são lidos do inventário atual no momento da geração.
+
 ## Desenvolvimento
 
 ```powershell

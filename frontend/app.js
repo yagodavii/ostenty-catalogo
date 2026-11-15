@@ -112,7 +112,7 @@ function renderAdmin() {
   $("#statActive").textContent = state.products.filter((product) => product.status === "active").length;
   $("#statTotal").textContent = state.products.length;
   $("#statSelected").textContent = state.selected.size;
-  $("#adminTableBody").innerHTML = products.map((product) => `<tr><td><div class="table-product"><div class="table-thumb">${product.image ? `<img src="${escapeHtml(product.image)}" alt="" />` : "✦"}</div><span>${escapeHtml(product.name)}<small>${escapeHtml(product.description || "Sem descrição")}</small></span></div></td><td>${escapeHtml(product.code)}</td><td>${escapeHtml(product.category)}</td><td>${formatPrice(product.price)}</td><td><span class="status-badge ${product.status}">${product.status === "active" ? "Ativo" : "Inativo"}</span></td><td><div class="row-actions"><button title="Editar" data-edit-product="${product.id}">Editar</button><button title="Ativar ou desativar" data-toggle-product="${product.id}">${product.status === "active" ? "Ocultar" : "Ativar"}</button><button title="Excluir" data-delete-product="${product.id}">Excluir</button></div></td></tr>`).join("");
+  $("#adminTableBody").innerHTML = products.map((product) => `<tr><td><div class="table-product"><div class="table-thumb">${product.image ? `<img src="${escapeHtml(product.image)}" alt="" />` : "✦"}</div><span>${escapeHtml(product.name)}<small>${escapeHtml(product.description || "Sem descrição")}</small></span></div></td><td>${escapeHtml(product.code)}</td><td>${escapeHtml(product.category)}</td><td>${formatPrice(product.price)}</td><td><span class="status-badge ${product.status}">${product.status === "active" ? "Ativo" : "Inativo"}</span></td><td><div class="row-actions">${product.status === "active" ? `<button title="Gerar PDF individual" data-print-product="${product.id}">PDF</button>` : ""}<button title="Editar" data-edit-product="${product.id}">Editar</button><button title="Ativar ou desativar" data-toggle-product="${product.id}">${product.status === "active" ? "Ocultar" : "Ativar"}</button><button title="Excluir" data-delete-product="${product.id}">Excluir</button></div></td></tr>`).join("");
   $("#adminEmpty").classList.toggle("hidden", products.length > 0);
 }
 
@@ -183,23 +183,58 @@ function renderImportPreview() {
   $("#confirmImportButton").disabled = valid === 0;
 }
 
+function printProductCard(product) {
+  return `<article class="print-product">${product.image ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" />` : `<div class="print-placeholder-print">✦</div>`}<h4>${escapeHtml(product.name)}</h4><p>${escapeHtml(product.code)} · ${escapeHtml(product.description || "")}</p><strong>${formatPrice(product.price)}</strong></article>`;
+}
+
+function buildPrintMarkup(products, options = {}) {
+  const individual = options.individual || products.length === 1;
+  if (individual) {
+    const product = products[0];
+    return `<div class="print-individual-sheet"><div class="print-individual-brand"><div class="print-brand">✦ OSTENTY<small>SEMIJOIAS</small></div><div class="print-subtitle">Seu brilho, sua essência.</div></div><div class="print-individual-visual">${product.image ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" />` : `<div class="print-placeholder-print">✦</div>`}</div><div class="print-individual-info"><span class="print-category-label">${escapeHtml(product.category)}</span><h1>${escapeHtml(product.name)}</h1><p class="print-code-label">Código ${escapeHtml(product.code)}</p><p class="print-individual-description">${escapeHtml(product.description || "Peça escolhida para trazer presença e delicadeza à sua composição.")}</p><strong>${formatPrice(product.price)}</strong></div></div>`;
+  }
+  const categories = [...new Set(products.map((product) => product.category))];
+  return `<div class="print-cover"><div class="print-brand">✦ OSTENTY<small>SEMIJOIAS</small></div><div class="print-title">Catálogo digital</div><div class="print-subtitle">Seu brilho, sua essência. · ${new Date().toLocaleDateString("pt-BR")}</div></div>${categories.map((category) => `<section><h2 class="print-category">${escapeHtml(category)}</h2><div class="print-grid">${products.filter((product) => product.category === category).map(printProductCard).join("")}</div></section>`).join("")}`;
+}
+
+function openPrintWindow(products, title, options = {}) {
+  if (!products.length) { showToast("Não há produtos ativos para gerar o catálogo."); return; }
+  const popup = window.open("", "_blank");
+  if (!popup) { showToast("Permita pop-ups para gerar o PDF."); return; }
+  popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><link rel="stylesheet" href="${window.location.origin}/frontend/styles.css"></head><body><section id="printCatalog" class="print-catalog">${buildPrintMarkup(products, options)}</section><script>window.addEventListener("load",()=>setTimeout(()=>window.print(),350));<\/script></body></html>`);
+  popup.document.close();
+}
+
 function buildPrintCatalog() {
+  const products = state.products.filter((product) => product.status === "active");
+  openPrintWindow(products, "OSTENTY — Catálogo completo");
+}
+
+function buildCategoryPrintCatalogs() {
   const chosen = $$(".pdf-category:checked").map((checkbox) => checkbox.value);
   const all = $("#pdfAllCategories").checked;
   const categories = all || chosen.length === CATEGORIES.length ? CATEGORIES : chosen;
-  const products = state.products.filter((product) => product.status === "active" && categories.includes(product.category));
-  $("#printCatalog").innerHTML = `<div class="print-cover"><div class="print-brand">✦ OSTENTY<small>SEMIJOIAS</small></div><div class="print-title">Catálogo digital</div><div class="print-subtitle">Seu brilho, sua essência. · ${new Date().toLocaleDateString("pt-BR")}</div></div>${categories.map((category) => { const categoryProducts = products.filter((product) => product.category === category); if (!categoryProducts.length) return ""; return `<section><h2 class="print-category">${escapeHtml(category)}</h2><div class="print-grid">${categoryProducts.map((product) => `<article class="print-product">${product.image ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" />` : `<div class="print-placeholder-print">✦</div>`}<h4>${escapeHtml(product.name)}</h4><p>${escapeHtml(product.code)} · ${escapeHtml(product.description || "")}</p><strong>${formatPrice(product.price)}</strong></article>`).join("")}</div></section>`; }).join("") || `<p>Não há produtos ativos nas categorias selecionadas.</p>`}`;
-  if (!products.length) { showToast("Não há produtos ativos para gerar o catálogo."); return; }
-  window.print();
+  if (!categories.length) { showToast("Selecione pelo menos uma categoria."); return; }
+  const active = state.products.filter((product) => product.status === "active");
+  const available = categories.map((category) => ({ category, products: active.filter((product) => product.category === category) })).filter((item) => item.products.length);
+  if (!available.length) { showToast("Não há produtos ativos nas categorias selecionadas."); return; }
+  available.forEach((item, index) => window.setTimeout(() => openPrintWindow(item.products, `OSTENTY — ${item.category}`), index * 450));
+  showToast(`${available.length} catálogo(s) por categoria preparado(s).`);
+}
+
+function buildIndividualPdf(product) {
+  if (!product || product.status !== "active") { showToast("Apenas produtos ativos podem gerar PDF."); return; }
+  openPrintWindow([product], `OSTENTY — ${product.name}`, { individual: true });
 }
 
 document.addEventListener("click", async (event) => {
-  const target = event.target.closest("[data-view-product], [data-select-product], [data-catalog-category], [data-edit-product], [data-delete-product], [data-toggle-product], [data-close-modal]");
+  const target = event.target.closest("[data-view-product], [data-select-product], [data-catalog-category], [data-edit-product], [data-delete-product], [data-toggle-product], [data-print-product], [data-close-modal]");
   if (!target) return;
   if (target.matches("[data-catalog-category]")) { state.catalogCategory = target.dataset.catalogCategory; renderCatalog(); return; }
   if (target.matches("[data-select-product]")) { const id = target.dataset.selectProduct; state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id); renderCatalog(); return; }
   if (target.matches("[data-view-product]")) { openProductDetail(state.products.find((product) => product.id === target.dataset.viewProduct)); return; }
   if (target.matches("[data-edit-product]")) { openProductModal(state.products.find((product) => product.id === target.dataset.editProduct)); return; }
+  if (target.matches("[data-print-product]")) { buildIndividualPdf(state.products.find((product) => product.id === target.dataset.printProduct)); return; }
   if (target.matches("[data-toggle-product]")) { const product = state.products.find((item) => item.id === target.dataset.toggleProduct); if (product) { const nextStatus = product.status === "active" ? "inactive" : "active"; const result = await tryApi(`/products?id=${encodeURIComponent(product.id)}`, { method: "PUT", body: JSON.stringify({ ...product, status: nextStatus }) }); product.status = result?.product?.status || nextStatus; saveProducts(); renderAdmin(); renderCatalog(); showToast(product.status === "active" ? "Produto ativado." : "Produto ocultado do catálogo."); } return; }
   if (target.matches("[data-delete-product]")) { const product = state.products.find((item) => item.id === target.dataset.deleteProduct); if (product && window.confirm(`Excluir “${product.name}”?`)) { await tryApi(`/products?id=${encodeURIComponent(product.id)}`, { method: "DELETE" }); state.products = state.products.filter((item) => item.id !== product.id); state.selected.delete(product.id); saveProducts(); renderAdmin(); renderCatalog(); showToast("Produto excluído."); } return; }
   if (target.matches("[data-close-modal]")) closeModals();
@@ -221,5 +256,6 @@ $("#confirmImportButton").addEventListener("click", async () => { const validRow
 $("#shareSelectionButton").addEventListener("click", () => { const products = state.products.filter((product) => state.selected.has(product.id)); if (!products.length) { showToast("Selecione pelo menos uma peça para compartilhar."); return; } const message = `Olá! Gostaria de saber mais sobre estas peças OSTENTY:%0A%0A${products.map((product) => `• ${product.name} — código ${product.code}`).join("%0A")}`; window.open(`https://wa.me/?text=${message}`, "_blank", "noopener"); });
 $("#modalSelectButton").addEventListener("click", () => { const id = $("#modalSelectButton").dataset.productId; state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id); openProductDetail(state.products.find((product) => product.id === id)); renderCatalog(); });
 $("#generatePdfButton").addEventListener("click", buildPrintCatalog);
+$("#generateCategoryPdfButton").addEventListener("click", buildCategoryPrintCatalogs);
 
 renderCategoryFilters(); routeFromHash(); refreshProductsFromApi();
