@@ -20,4 +20,4 @@ As fotos iniciais estão em `frontend/assets/products/`, separadas por categoria
 
 ## PDFs
 
-No painel, gere catálogos completos ou separados por categoria. O navegador abre a janela de impressão; escolha **Salvar como PDF**.
+No painel, gere catálogos completos ou PDFs individuais diretamente para download. A opção por categoria baixa um ZIP com um PDF separado para cada categoria selecionada.

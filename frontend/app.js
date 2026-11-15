@@ -280,48 +280,235 @@ function renderImportPreview() {
   $("#confirmImportButton").disabled = valid === 0;
 }
 
-function printProductCard(product) {
-  return `<article class="print-product">${product.image ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" />` : `<div class="print-placeholder-print">✦</div>`}<h4>${escapeHtml(product.name)}</h4><p>${escapeHtml(product.code)} · ${escapeHtml(product.description || "")}</p><strong>${formatPrice(product.price)}</strong></article>`;
+
+const PDF_COLORS = { ink: [18, 13, 16], rose: [185, 114, 147], muted: [126, 110, 118], line: [232, 213, 197] };
+const pdfImageCache = new Map();
+
+function safeFileName(value) {
+  return normalizeSearchText(value).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "catalogo";
 }
 
-function buildPrintMarkup(products, options = {}) {
-  const individual = options.individual || products.length === 1;
-  if (individual) {
-    const product = products[0];
-    return `<div class="print-individual-sheet"><div class="print-individual-brand"><div class="print-brand">✦ OSTENTY<small>SEMIJOIAS</small></div><div class="print-subtitle">Seu brilho, sua essência.</div></div><div class="print-individual-visual">${product.image ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" />` : `<div class="print-placeholder-print">✦</div>`}</div><div class="print-individual-info"><span class="print-category-label">${escapeHtml(product.category)}</span><h1>${escapeHtml(product.name)}</h1><p class="print-code-label">Código ${escapeHtml(product.code)}</p><p class="print-individual-description">${escapeHtml(product.description || "") }</p><strong>${formatPrice(product.price)}</strong></div></div>`;
+function loadPdfImage(url) {
+  if (!url) return Promise.resolve(null);
+  if (pdfImageCache.has(url)) return pdfImageCache.get(url);
+  const task = new Promise((resolve) => {
+    const image = new Image();
+    if (!url.startsWith("data:")) image.crossOrigin = "anonymous";
+    image.onload = () => {
+      try {
+        const scale = Math.min(1, 1000 / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext("2d");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve({ data: canvas.toDataURL("image/jpeg", 0.86), width: canvas.width, height: canvas.height });
+      } catch { resolve(null); }
+    };
+    image.onerror = () => resolve(null);
+    image.src = url;
+  });
+  pdfImageCache.set(url, task);
+  return task;
+}
+
+function addPdfBrand(doc, category, pageLabel = "") {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.setTextColor(...PDF_COLORS.ink);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("OSTENTY", 14, 16);
+  doc.setTextColor(...PDF_COLORS.rose);
+  doc.setFontSize(7);
+  doc.text("SEMIJOIAS", 14, 21);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...PDF_COLORS.muted);
+  doc.setFontSize(9);
+  doc.text(category.toLocaleUpperCase("pt-BR"), pageWidth - 14, 17, { align: "right" });
+  if (pageLabel) doc.text(pageLabel, pageWidth - 14, 22, { align: "right" });
+  doc.setDrawColor(...PDF_COLORS.line);
+  doc.line(14, 27, pageWidth - 14, 27);
+}
+
+async function addPdfProductCard(doc, product, x, y, width, height) {
+  doc.setDrawColor(...PDF_COLORS.line);
+  doc.roundedRect(x, y, width, height, 2, 2);
+  const image = await loadPdfImage(product.image);
+  if (image) {
+    const box = { x: x + 3, y: y + 3, w: width - 6, h: 43 };
+    const ratio = Math.min(box.w / image.width, box.h / image.height);
+    const w = image.width * ratio, h = image.height * ratio;
+    doc.addImage(image.data, "JPEG", box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h);
   }
-  const categories = [...new Set(products.map((product) => product.category))];
-  return `<div class="print-cover"><div class="print-brand">✦ OSTENTY<small>SEMIJOIAS</small></div><div class="print-title">Catálogo digital</div><div class="print-subtitle">Seu brilho, sua essência. · ${new Date().toLocaleDateString("pt-BR")}</div></div>${categories.map((category) => `<section><h2 class="print-category">${escapeHtml(category)}</h2><div class="print-grid">${products.filter((product) => product.category === category).map(printProductCard).join("")}</div></section>`).join("")}`;
+  const nameLines = doc.splitTextToSize(product.name || "", width - 8).slice(0, 2);
+  doc.setTextColor(...PDF_COLORS.ink);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text(nameLines, x + 4, y + 51);
+  let cursor = y + 51 + Math.max(1, nameLines.length) * 4;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...PDF_COLORS.muted);
+  doc.setFontSize(7.5);
+  doc.text("CÓDIGO " + (product.code || ""), x + 4, cursor);
+  cursor += 4;
+  if (product.description) {
+    const description = doc.splitTextToSize(product.description, width - 8).slice(0, 2);
+    doc.text(description, x + 4, cursor);
+    cursor += description.length * 3.5;
+  }
+  doc.setTextColor(...PDF_COLORS.rose);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.text(formatPrice(product.price), x + 4, Math.min(y + height - 4, Math.max(cursor + 2, y + height - 5)));
 }
 
-function openPrintWindow(products, title, options = {}) {
-  if (!products.length) { showToast("Não há produtos ativos para gerar o catálogo."); return; }
-  const popup = window.open("", "_blank");
-  if (!popup) { showToast("Permita pop-ups para gerar o PDF."); return; }
-  popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><link rel="stylesheet" href="${window.location.origin}/frontend/styles.css"></head><body><section id="printCatalog" class="print-catalog">${buildPrintMarkup(products, options)}</section><script>window.addEventListener("load",()=>setTimeout(()=>window.print(),350));<\/script></body></html>`);
-  popup.document.close();
+async function addPdfIndividual(doc, product) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  addPdfBrand(doc, product.category, "CATÁLOGO INDIVIDUAL");
+  const image = await loadPdfImage(product.image);
+  if (image) {
+    const box = { x: 18, y: 38, w: pageWidth - 36, h: 153 };
+    const ratio = Math.min(box.w / image.width, box.h / image.height);
+    const w = image.width * ratio, h = image.height * ratio;
+    doc.addImage(image.data, "JPEG", box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h);
+  }
+  doc.setTextColor(...PDF_COLORS.rose);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text(product.category.toLocaleUpperCase("pt-BR"), 18, 207);
+  doc.setTextColor(...PDF_COLORS.ink);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.text(doc.splitTextToSize(product.name || "", pageWidth - 36).slice(0, 2), 18, 219);
+  doc.setTextColor(...PDF_COLORS.muted);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text("Código " + (product.code || ""), 18, 239);
+  const description = product.description ? doc.splitTextToSize(product.description, pageWidth - 36).slice(0, 5) : [];
+  if (description.length) doc.text(description, 18, 250);
+  doc.setTextColor(...PDF_COLORS.rose);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text(formatPrice(product.price), 18, description.length ? 276 : 261);
+}
+
+async function createCatalogPdf(products, title, options = {}) {
+  const { jsPDF } = window.jspdf || {};
+  if (!jsPDF) throw new Error("O gerador de PDF não carregou. Atualize a página e tente novamente.");
+  if (!products.length) throw new Error("Não há produtos para gerar este PDF.");
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+  if (options.individual || products.length === 1) {
+    await addPdfIndividual(doc, products[0]);
+    return doc;
+  }
+  const grouped = [...new Set(products.map((product) => product.category))]
+    .map((category) => ({ category, products: products.filter((product) => product.category === category) }));
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  doc.setTextColor(...PDF_COLORS.rose);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("OSTENTY  ·  SEMIJOIAS", pageWidth / 2, 79, { align: "center" });
+  doc.setTextColor(...PDF_COLORS.ink);
+  doc.setFont("times", "bold");
+  doc.setFontSize(32);
+  doc.text("Catálogo", pageWidth / 2, 111, { align: "center" });
+  doc.text("digital", pageWidth / 2, 124, { align: "center" });
+  doc.setDrawColor(...PDF_COLORS.rose);
+  doc.line(pageWidth / 2 - 20, 137, pageWidth / 2 + 20, 137);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(...PDF_COLORS.muted);
+  doc.text("Seu brilho, sua essência.  ·  " + new Date().toLocaleDateString("pt-BR"), pageWidth / 2, 146, { align: "center" });
+
+  for (const group of grouped) {
+    doc.addPage();
+    addPdfBrand(doc, group.category, title);
+    for (let index = 0; index < group.products.length; index++) {
+      if (index > 0 && index % 6 === 0) {
+        doc.addPage();
+        addPdfBrand(doc, group.category, title);
+      }
+      const position = index % 6;
+      const column = position % 2;
+      const row = Math.floor(position / 2);
+      const x = 14 + column * 93;
+      const y = 33 + row * 84;
+      await addPdfProductCard(doc, group.products[index], x, y, 88, 79);
+      if ((index + 1) % 12 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+  for (let page = 2; page <= doc.getNumberOfPages(); page++) {
+    doc.setPage(page);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...PDF_COLORS.muted);
+    doc.text(String(page - 1), pageWidth - 14, pageHeight - 7, { align: "right" });
+  }
+  return doc;
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+async function withPdfButton(button, task) {
+  button.disabled = true;
+  const original = button.innerHTML;
+  button.textContent = "Preparando PDF…";
+  try { await task(); }
+  catch (error) { showToast(error.message || "Não foi possível gerar o PDF."); }
+  finally { button.disabled = false; button.innerHTML = original; }
 }
 
 function buildPrintCatalog() {
-  const products = state.products.filter((product) => product.status === "active");
-  openPrintWindow(products, "OSTENTY — Catálogo completo");
+  const button = $("#generatePdfButton");
+  withPdfButton(button, async () => {
+    const products = state.products.filter((product) => product.status === "active");
+    const doc = await createCatalogPdf(products, "Catálogo completo");
+    doc.save("ostenty-catalogo-" + new Date().toISOString().slice(0, 10) + ".pdf");
+    showToast("PDF completo baixado.");
+  });
 }
 
 function buildCategoryPrintCatalogs() {
-  const chosen = $$(".pdf-category:checked").map((checkbox) => checkbox.value);
-  const all = $("#pdfAllCategories").checked;
-  const categories = all || chosen.length === CATEGORIES.length ? CATEGORIES : chosen;
-  if (!categories.length) { showToast("Selecione pelo menos uma categoria."); return; }
-  const active = state.products.filter((product) => product.status === "active");
-  const available = categories.map((category) => ({ category, products: active.filter((product) => product.category === category) })).filter((item) => item.products.length);
-  if (!available.length) { showToast("Não há produtos ativos nas categorias selecionadas."); return; }
-  available.forEach((item, index) => window.setTimeout(() => openPrintWindow(item.products, `OSTENTY — ${item.category}`), index * 450));
-  showToast(`${available.length} catálogo(s) por categoria preparado(s).`);
+  const button = $("#generateCategoryPdfButton");
+  withPdfButton(button, async () => {
+    const chosen = $$(".pdf-category:checked").map((checkbox) => checkbox.value);
+    const all = $("#pdfAllCategories").checked;
+    const categories = all || chosen.length === CATEGORIES.length ? CATEGORIES : chosen;
+    if (!categories.length) throw new Error("Selecione pelo menos uma categoria.");
+    const active = state.products.filter((product) => product.status === "active");
+    const available = categories.map((category) => ({ category, products: active.filter((product) => product.category === category) })).filter((item) => item.products.length);
+    if (!available.length) throw new Error("Não há produtos ativos nas categorias selecionadas.");
+    const zip = new window.JSZip();
+    for (const item of available) {
+      const doc = await createCatalogPdf(item.products, item.category);
+      zip.file("ostenty-" + safeFileName(item.category) + ".pdf", doc.output("blob"));
+    }
+    const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 5 } });
+    downloadBlob(blob, "ostenty-catalogos-por-categoria-" + new Date().toISOString().slice(0, 10) + ".zip");
+    showToast(available.length + " PDF(s) por categoria baixados em um ZIP.");
+  });
 }
 
 function buildIndividualPdf(product) {
   if (!product || product.status !== "active") { showToast("Apenas produtos ativos podem gerar PDF."); return; }
-  openPrintWindow([product], `OSTENTY — ${product.name}`, { individual: true });
+  const button = document.querySelector('[data-print-product="' + CSS.escape(product.id) + '"]');
+  withPdfButton(button || $("#generatePdfButton"), async () => {
+    const doc = await createCatalogPdf([product], product.name, { individual: true });
+    doc.save("ostenty-" + safeFileName(product.code) + ".pdf");
+    showToast("PDF de " + product.name + " baixado.");
+  });
 }
 
 document.addEventListener("click", async (event) => {

@@ -1,0 +1,2 @@
+PDF downloads use jsPDF 4.2.1 (MIT License) and JSZip 3.10.2 (MIT License).
+Their full license texts are included as LICENSE-jspdf.txt and LICENSE-jszip.txt.
