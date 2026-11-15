@@ -16,7 +16,9 @@ const state = {
   photoDraft: [],
   photoPrimaryUrl: "",
   photoReplaceIndex: null,
-  adminAuthenticated: true,
+  adminAuthenticated: false,
+  adminEmail: "",
+  authStatus: "unknown",
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -69,16 +71,76 @@ function showToast(message) {
   toast.textContent = message; toast.classList.add("show");
   window.clearTimeout(showToast.timer); showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2800);
 }
-function isAdmin() { return true; }
+function isAdmin() { return state.adminAuthenticated && state.authStatus === "authenticated"; }
 
-async function restoreAdminSession() { state.adminAuthenticated = true; renderAdmin(); }
+function renderAuthView(view, message = "") {
+  const views = { login: "#authLoginView", register: "#authRegisterView", change: "#authChangePasswordView", unavailable: "#authUnavailableView" };
+  Object.entries(views).forEach(([key, selector]) => $(selector).classList.toggle("hidden", key !== view));
+  $("#adminAuthPanel").classList.remove("hidden");
+  $("#adminPanel").classList.add("hidden");
+  if (view === "login") $("#authLoginMessage").textContent = message;
+  if (view === "register") $("#authRegisterMessage").textContent = message;
+  if (view === "change") $("#authChangePasswordMessage").textContent = message;
+  if (view === "unavailable") $("#authUnavailableMessage").textContent = message;
+}
+
+async function refreshAdminSession() {
+  state.authStatus = "loading";
+  renderAuthView("login");
+  try {
+    const response = await fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "O serviço de autenticação está indisponível.");
+    if (!result.authenticated) {
+      state.adminAuthenticated = false;
+      state.adminEmail = "";
+      state.authStatus = "signed-out";
+      renderAuthView("login");
+      return;
+    }
+    state.adminAuthenticated = true;
+    state.adminEmail = result.email;
+    state.authStatus = result.mustChangePassword ? "must-change" : "authenticated";
+    if (result.mustChangePassword) renderAuthView("change");
+    else renderAdmin();
+  } catch (error) {
+    state.adminAuthenticated = false;
+    state.authStatus = "unavailable";
+    renderAuthView("unavailable", error.message || "Não foi possível verificar sua sessão.");
+  }
+}
+
+async function postAuth(path, payload = {}) {
+  const response = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "Não foi possível concluir a operação.");
+  return result;
+}
+
+function completeAuthentication(result) {
+  state.adminAuthenticated = true;
+  state.adminEmail = result.email;
+  state.authStatus = result.mustChangePassword ? "must-change" : "authenticated";
+  if (result.mustChangePassword) renderAuthView("change");
+  else renderAdmin();
+}
 
 function setView(view) {
   const views = { landing: "#landingView", catalog: "#catalogView", admin: "#adminView" };
   Object.entries(views).forEach(([key, selector]) => $(selector).classList.toggle("hidden", key !== view));
   $$('[data-view-link]').forEach((link) => link.classList.toggle("active", link.dataset.viewLink === view));
   if (view === "catalog") renderCatalog();
-  if (view === "admin") renderAdmin();
+  if (view === "admin") {
+    if (state.authStatus === "unknown" || state.authStatus === "signed-out" || state.authStatus === "unavailable") refreshAdminSession();
+    else if (state.authStatus === "must-change") renderAuthView("change");
+    else if (state.authStatus === "authenticated") renderAdmin();
+    else renderAuthView("login");
+  }
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -149,6 +211,7 @@ function renderCatalog() {
 
 function renderAdmin() {
   $("#adminPanel").classList.toggle("hidden", !isAdmin());
+  $("#adminAuthPanel").classList.toggle("hidden", isAdmin());
   if (!isAdmin()) return;
   renderCategoryFilters();
   const products = state.products.filter((product) => (state.adminCategory === "all" || product.category === state.adminCategory) && (!state.adminSearchQuery || matchesSearch(product, state.adminSearchQuery)));
@@ -544,6 +607,51 @@ document.addEventListener("click", async (event) => {
   if (target.matches("[data-toggle-product]")) { const product = state.products.find((item) => item.id === target.dataset.toggleProduct); if (product) { const nextStatus = product.status === "active" ? "inactive" : "active"; product.status = nextStatus; saveProducts(); renderAdmin(); renderCatalog(); showToast(product.status === "active" ? "Produto ativado." : "Produto ocultado do catálogo."); } return; }
   if (target.matches("[data-delete-product]")) { const product = state.products.find((item) => item.id === target.dataset.deleteProduct); if (product && window.confirm(`Excluir “${product.name}”?`)) { state.products = state.products.filter((item) => item.id !== product.id); saveProducts(); renderAdmin(); renderCatalog(); showToast("Produto excluído."); } return; }
   if (target.matches("[data-close-modal]")) closeModals();
+});
+
+document.addEventListener("click", async (event) => {
+  const target = event.target.closest("[data-auth-view], #adminLogoutButton");
+  if (!target) return;
+  if (target.dataset.authView) { renderAuthView(target.dataset.authView); return; }
+  try { await postAuth("/api/auth/logout"); } catch { /* The session cookie is still cleared locally below. */ }
+  state.adminAuthenticated = false;
+  state.adminEmail = "";
+  state.authStatus = "signed-out";
+  renderAuthView("login");
+});
+
+$("#adminLoginForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const message = $("#authLoginMessage");
+  message.textContent = "Verificando acesso…";
+  try {
+    const result = await postAuth("/api/auth/login", { email: $("#loginEmail").value, password: $("#loginPassword").value });
+    completeAuthentication(result);
+  } catch (error) { message.textContent = error.message; }
+});
+
+$("#adminRegisterForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const message = $("#authRegisterMessage");
+  message.textContent = "Ativando acesso…";
+  try {
+    const result = await postAuth("/api/auth/register", { email: $("#registerEmail").value, password: $("#registerPassword").value });
+    completeAuthentication(result);
+  } catch (error) { message.textContent = error.message; }
+});
+
+$("#adminChangePasswordForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const message = $("#authChangePasswordMessage");
+  const password = $("#newPassword").value;
+  if (password !== $("#confirmNewPassword").value) { message.textContent = "As senhas não coincidem."; return; }
+  message.textContent = "Salvando nova senha…";
+  try {
+    const result = await postAuth("/api/auth/change-password", { password });
+    $("#newPassword").value = "";
+    $("#confirmNewPassword").value = "";
+    completeAuthentication(result);
+  } catch (error) { message.textContent = error.message; }
 });
 
 window.addEventListener("hashchange", routeFromHash);
