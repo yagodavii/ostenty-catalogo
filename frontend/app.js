@@ -96,7 +96,7 @@ function renderCategoryFilters() {
 }
 
 function productImage(product, className = "") {
-  return product.image ? `<img class="${className}" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" />` : `<span class="product-placeholder ${className}">✦</span>`;
+  return product.image ? `<img class="${className}" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async" />` : `<span class="product-placeholder ${className}">✦</span>`;
 }
 
 function getProductImages(product) {
@@ -154,7 +154,7 @@ function renderAdmin() {
   const products = state.products.filter((product) => (state.adminCategory === "all" || product.category === state.adminCategory) && (!state.adminSearchQuery || matchesSearch(product, state.adminSearchQuery)));
   $("#statActive").textContent = state.products.filter((product) => product.status === "active").length;
   $("#statTotal").textContent = state.products.length;
-  $("#adminTableBody").innerHTML = products.map((product) => `<tr><td><div class="table-product"><div class="table-thumb">${product.image ? `<img src="${escapeHtml(product.image)}" alt="" />` : "✦"}</div><span>${escapeHtml(product.name)}<small>${escapeHtml(product.description || "Sem descrição")}</small></span></div></td><td>${escapeHtml(product.code)}</td><td>${escapeHtml(product.category)}</td><td>${formatPrice(product.price)}</td><td><span class="status-badge ${product.status}">${product.status === "active" ? "Ativo" : "Inativo"}</span></td><td><div class="row-actions"><button title="Gerenciar fotos" data-manage-photos="${product.id}">Fotos</button>${product.status === "active" ? `<button title="Gerar PDF individual" data-print-product="${product.id}">PDF</button>` : ""}<button title="Editar" data-edit-product="${product.id}">Editar</button><button title="Ativar ou desativar" data-toggle-product="${product.id}">${product.status === "active" ? "Ocultar" : "Ativar"}</button><button title="Excluir" data-delete-product="${product.id}">Excluir</button></div></td></tr>`).join("");
+  $("#adminTableBody").innerHTML = products.map((product) => `<tr><td><div class="table-product"><div class="table-thumb">${product.image ? `<img src="${escapeHtml(product.image)}" alt="" loading="lazy" decoding="async" />` : "✦"}</div><span>${escapeHtml(product.name)}<small>${escapeHtml(product.description || "Sem descrição")}</small></span></div></td><td>${escapeHtml(product.code)}</td><td>${escapeHtml(product.category)}</td><td>${formatPrice(product.price)}</td><td><span class="status-badge ${product.status}">${product.status === "active" ? "Ativo" : "Inativo"}</span></td><td><div class="row-actions"><button title="Gerenciar fotos" data-manage-photos="${product.id}">Fotos</button>${product.status === "active" ? `<button title="Gerar PDF individual" data-print-product="${product.id}">PDF</button>` : ""}<button title="Editar" data-edit-product="${product.id}">Editar</button><button title="Ativar ou desativar" data-toggle-product="${product.id}">${product.status === "active" ? "Ocultar" : "Ativar"}</button><button title="Excluir" data-delete-product="${product.id}">Excluir</button></div></td></tr>`).join("");
   $("#adminEmpty").classList.toggle("hidden", products.length > 0);
 }
 
@@ -540,7 +540,7 @@ $("#confirmImportButton").addEventListener("click", async () => { const validRow
 $("#generatePdfButton").addEventListener("click", buildPrintCatalog);
 $("#generateCategoryPdfButton").addEventListener("click", buildCategoryPrintCatalogs);
 
-renderCategoryFilters(); routeFromHash(); renderAdmin();
+renderCategoryFilters(); routeFromHash();
 
 const installAppButton = $("#installAppButton");
 let deferredInstallPrompt = null;

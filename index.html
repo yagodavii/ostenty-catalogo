@@ -1,15 +1,111 @@
 <!doctype html>
 <html lang="pt-BR">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="refresh" content="0; url=/frontend/index.html" />
-    <title>OSTENTY Semijoias</title>
-    <script>
-      window.location.replace("/frontend/index.html" + window.location.search + window.location.hash);
-    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080508" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="OSTENTY" />
+    <meta name="description" content="Catálogo digital OSTENTY SEMIJOIAS — Seu brilho, sua essência." />
+    <title>OSTENTY SEMIJOIAS — Catálogo digital</title>
+    <link rel="manifest" href="/frontend/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/frontend/icons/icon-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/frontend/styles.css" />
   </head>
   <body>
-    <p>Abrindo o catálogo OSTENTY… <a href="/frontend/index.html">Continuar</a></p>
+    <div class="app-shell">
+      <header class="site-header">
+        <a class="brand-lockup" href="#inicio" aria-label="OSTENTY Semijoias, início">
+          <span class="brand-mark">✦</span>
+          <span>
+            <strong>OSTENTY</strong>
+            <small>SEMIJOIAS</small>
+          </span>
+        </a>
+        <nav class="main-nav" aria-label="Navegação principal">
+          <a href="#inicio" data-view-link="landing">Início</a>
+          <a href="#catalogo" data-view-link="catalog">Catálogo</a>
+          <a href="#admin" data-view-link="admin">Administração</a>
+        </nav>
+        <button class="button button-soft install-app-button" id="installAppButton" type="button">Instalar app</button>
+        <button class="icon-button mobile-menu-button" id="mobileMenuButton" aria-label="Abrir menu">☰</button>
+      </header>
+
+      <main>
+        <section class="view landing-view" id="landingView" aria-labelledby="heroTitle">
+          <div class="hero-grid">
+            <div class="hero-copy">
+              <p class="eyebrow"><span></span> Catálogo digital</p>
+              <h1 id="heroTitle">Seu brilho,<br /><em>sua essência.</em></h1>
+              <p class="hero-text">Uma curadoria de semijoias para acompanhar a sua forma de se expressar — com delicadeza, presença e personalidade.</p>
+              <div class="hero-actions">
+                <a class="button button-dark" href="#catalogo">Explorar catálogo <span>↗</span></a>
+                <a class="text-link" href="#admin">Acessar painel <span>→</span></a>
+              </div>
+              <div class="hero-note"><span>01</span><p>Peças escolhidas para<br />momentos que ficam.</p></div>
+            </div>
+            <div class="hero-art" aria-hidden="true">
+              <div class="art-halo halo-one"></div>
+              <div class="art-halo halo-two"></div>
+              <div class="art-orb"><span>✦</span></div>
+              <div class="art-card art-card-top"><span class="art-card-kicker">OSTENTY</span><strong>brilho<br />que fala</strong><i>✦</i></div>
+              <div class="art-card art-card-bottom"><small>SEU BRILHO,</small><strong>SUA ESSÊNCIA.</strong></div>
+              <div class="floating-tag">coleção<br /><b>essência</b></div>
+            </div>
+          </div>
+          <div class="brand-strip">
+            <div><span class="strip-number">7</span><span>categorias<br /><small>para explorar</small></span></div>
+            <div><span class="strip-number">∞</span><span>formas de<br /><small>ser você</small></span></div>
+            <div><span class="strip-number">♡</span><span>feito para<br /><small>se destacar</small></span></div>
+          </div>
+          <div class="story-section">
+            <div>
+              <p class="eyebrow"><span></span> A marca</p>
+              <h2>Detalhes que<br /><em>contam histórias.</em></h2>
+            </div>
+            <div class="story-copy"><p>A OSTENTY acredita que cada peça pode revelar uma parte de quem você é. Este espaço foi criado para apresentar nossas escolhas com leveza e sofisticação.</p><a href="#catalogo" class="text-link">Ver peças disponíveis <span>→</span></a></div>
+          </div>
+        </section>
+
+        <section class="view catalog-view hidden" id="catalogView" aria-labelledby="catalogTitle">
+          <div class="page-heading">
+            <div><p class="eyebrow"><span></span> Curadoria OSTENTY</p><h2 id="catalogTitle">O seu próximo<br /><em>brilho está aqui.</em></h2></div>
+            <div class="heading-side"><p>Explore por categoria ou pesquise pelo nome e código da peça.</p><span id="catalogCount" class="count-pill">0 peças</span></div>
+          </div>
+          <div class="catalog-toolbar">
+            <div class="search-control catalog-search-control"><input id="catalogSearch" type="search" placeholder="Buscar por nome ou código" /><button class="button button-dark search-button" id="catalogSearchButton" type="button">Pesquisar</button></div>
+            <div class="category-filter" id="categoryFilter" role="list"></div>
+          </div>
+          <div id="catalogGrid" class="product-grid"></div>
+          <div id="catalogEmpty" class="empty-state hidden"><div class="empty-icon">✦</div><h3>Seu catálogo está pronto para receber brilho.</h3><p>As peças cadastradas pela equipe aparecerão aqui. Para começar, importe uma planilha ou cadastre seu primeiro produto no painel.</p><a href="#admin" class="button button-dark">Abrir painel administrativo <span>→</span></a></div>
+        </section>
+
+        <section class="view admin-view hidden" id="adminView" aria-labelledby="adminTitle">
+          <div id="adminPanel" class="hidden">
+            <div class="admin-topbar"><div><p class="eyebrow"><span></span> Gestão OSTENTY</p><h2>Olá, João.</h2><p class="muted">Mantenha o catálogo alinhado à essência da marca.</p></div><div class="admin-actions"><button class="button button-soft" id="openImportButton">Importar planilha</button><button class="button button-dark" id="openProductButton">Novo produto <span>+</span></button></div></div>
+            <div class="stats-grid"><div class="stat-card"><span class="stat-label">Produtos ativos</span><strong id="statActive">0</strong><span class="stat-foot">visíveis no catálogo</span></div><div class="stat-card"><span class="stat-label">Total cadastrado</span><strong id="statTotal">0</strong><span class="stat-foot">ativos + inativos</span></div><div class="stat-card"><span class="stat-label">Categorias</span><strong>07</strong><span class="stat-foot">curadorias OSTENTY</span></div></div>
+            <div class="admin-content-grid"><div class="management-card"><div class="section-heading"><div><p class="eyebrow"><span></span> Inventário</p><h3>Produtos cadastrados</h3></div><div class="table-tools"><div class="search-control admin-search-control"><input id="adminSearch" type="search" placeholder="Buscar produto" /><button class="button button-dark search-button" id="adminSearchButton" type="button">Pesquisar</button></div><select id="adminCategoryFilter"><option value="all">Todas as categorias</option></select></div></div><div class="admin-table-wrap"><table><thead><tr><th>Produto</th><th>Código</th><th>Categoria</th><th>Preço</th><th>Status</th><th></th></tr></thead><tbody id="adminTableBody"></tbody></table><div id="adminEmpty" class="table-empty"><span>✦</span><p>Nenhum produto cadastrado ainda.</p><small>Importe sua planilha ou crie sua primeira peça.</small></div></div></div><div class="side-card"><p class="eyebrow"><span></span> Publicação</p><h3>Gerar catálogos</h3><p>Baixe um PDF dos produtos ativos. Para gerar por categoria, marque as categorias que deseja incluir.</p><div class="pdf-mode-list"><button id="generatePdfButton" class="button button-dark full-width">PDF completo <span>↓</span></button><button id="generateCategoryPdfButton" class="button button-soft full-width">PDF por categoria <span>↓</span></button></div><div class="pdf-divider"><span>Escolha as categorias</span></div><div id="pdfCategoryList" class="pdf-category-list"></div><small class="side-note">Para baixar uma peça individual, use o botão PDF na linha do produto.</small></div></div>
+          </div>
+        </section>
+      </main>
+
+      <div id="productModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modalProductName"><div class="product-modal"><button class="modal-close" data-close-modal aria-label="Fechar">×</button><div id="modalImage" class="modal-image"></div><div class="modal-details"><p id="modalCategory" class="eyebrow"><span></span></p><h2 id="modalProductName"></h2><p id="modalCode" class="product-code"></p><p id="modalDescription" class="modal-description"></p><strong id="modalPrice" class="modal-price"></strong></div></div></div>
+
+      <div id="photoManagerModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="photoManagerTitle"><div class="form-modal photo-manager-modal"><button class="modal-close" data-close-modal aria-label="Fechar">×</button><p class="eyebrow"><span></span> Gestão exclusiva ADM</p><h2 id="photoManagerTitle">Fotos da peça</h2><p id="photoManagerProductLabel" class="muted"></p><div class="photo-upload-actions"><label class="button button-soft photo-upload-button">Adicionar fotos<input id="photoAddInput" type="file" accept="image/*" multiple /></label><small>As imagens ficam em pré-visualização até você salvar.</small></div><div id="photoManagerGrid" class="photo-manager-grid"></div><div id="photoManagerEmpty" class="photo-manager-empty hidden">Nenhuma foto cadastrada. Adicione a primeira imagem da peça.</div><div class="form-actions"><button type="button" class="button button-soft" data-close-modal>Cancelar</button><button id="savePhotosButton" type="button" class="button button-dark">Salvar fotos <span>→</span></button></div></div></div>
+
+      <div id="productFormModal" class="modal-backdrop hidden" role="dialog" aria-modal="true"><div class="form-modal"><button class="modal-close" data-close-modal aria-label="Fechar">×</button><p class="eyebrow"><span></span> Cadastro</p><h2 id="productFormTitle">Novo produto</h2><form id="productForm" class="product-form"><input type="hidden" id="productId" /><div class="form-grid"><label>Código exclusivo<input id="productCode" required placeholder="Ex.: OST-0001" /></label><label>Nome do produto<input id="productName" required placeholder="Ex.: Brinco Lumière" /></label><label class="full-span">Descrição<textarea id="productDescription" rows="3" placeholder="Descreva a peça em poucas palavras."></textarea></label><label>Preço<input id="productPrice" required inputmode="decimal" placeholder="R$ 0,00" /></label><label>Categoria<select id="productCategory" required></select></label><label>Status<select id="productStatus"><option value="active">Ativo</option><option value="inactive">Inativo</option></select></label><label class="full-span">Foto principal<input id="productImage" type="file" accept="image/*" /><small>Opcional. A imagem é armazenada localmente neste navegador.</small></label><label class="full-span">Fotos adicionais (URLs, uma por linha)<textarea id="productAdditionalImages" rows="2" placeholder="https://..."></textarea></label></div><div class="form-actions"><button type="button" class="button button-soft" data-close-modal>Cancelar</button><button type="submit" class="button button-dark">Salvar produto <span>→</span></button></div></form></div></div>
+
+      <div id="importModal" class="modal-backdrop hidden" role="dialog" aria-modal="true"><div class="form-modal import-modal"><button class="modal-close" data-close-modal aria-label="Fechar">×</button><p class="eyebrow"><span></span> Importação em massa</p><h2>Traga seu inventário<br /><em>para a OSTENTY.</em></h2><p class="muted">Use CSV com as colunas <code>codigo,nome,descricao,preco,categoria,status,imagem</code>. A primeira linha deve conter os títulos.</p><div class="import-drop"><input id="csvInput" type="file" accept=".csv,text/csv" /><span class="upload-icon">↑</span><strong>Escolha sua planilha CSV</strong><small>Os dados serão revisados antes da confirmação.</small></div><label class="folder-upload">Opcional: relacionar fotos por código<input id="imageFolderInput" type="file" accept="image/*" multiple webkitdirectory /></label><div id="importPreview" class="import-preview hidden"></div><div class="form-actions"><button type="button" class="button button-soft" data-close-modal>Cancelar</button><button id="confirmImportButton" type="button" class="button button-dark" disabled>Confirmar importação <span>→</span></button></div></div></div>
+
+      <section id="printCatalog" class="print-catalog" aria-hidden="true"></section>
+      <div id="toast" class="toast" role="status"></div>
+    </div>
+    <script src="/frontend/vendor/jspdf.umd.min.js"></script>
+    <script src="/frontend/products-seed.js"></script>
+    <script src="/frontend/app.js"></script>
   </body>
 </html>
