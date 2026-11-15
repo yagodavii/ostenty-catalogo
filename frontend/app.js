@@ -296,7 +296,7 @@ function loadPdfImage(url) {
     if (!url.startsWith("data:")) image.crossOrigin = "anonymous";
     image.onload = () => {
       try {
-        const scale = Math.min(1, 1000 / Math.max(image.naturalWidth, image.naturalHeight));
+        const scale = Math.min(1, 640 / Math.max(image.naturalWidth, image.naturalHeight));
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
         canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
@@ -304,7 +304,7 @@ function loadPdfImage(url) {
         context.fillStyle = "#ffffff";
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve({ data: canvas.toDataURL("image/jpeg", 0.86), width: canvas.width, height: canvas.height });
+        resolve({ data: canvas.toDataURL("image/jpeg", 0.68), width: canvas.width, height: canvas.height });
       } catch { resolve(null); }
     };
     image.onerror = () => resolve(null);
@@ -399,8 +399,11 @@ async function createCatalogPdf(products, title, options = {}) {
   if (!jsPDF) throw new Error("O gerador de PDF não carregou. Atualize a página e tente novamente.");
   if (!products.length) throw new Error("Não há produtos para gerar este PDF.");
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+  const onProgress = options.onProgress || (() => {});
+  onProgress(0, products.length);
   if (options.individual || products.length === 1) {
     await addPdfIndividual(doc, products[0]);
+    onProgress(1, 1);
     return doc;
   }
   const grouped = [...new Set(products.map((product) => product.category))]
@@ -437,7 +440,9 @@ async function createCatalogPdf(products, title, options = {}) {
       const x = 14 + column * 93;
       const y = 33 + row * 84;
       await addPdfProductCard(doc, group.products[index], x, y, 88, 79);
-      if ((index + 1) % 12 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+      const completed = grouped.slice(0, grouped.indexOf(group)).reduce((count, item) => count + item.products.length, 0) + index + 1;
+      onProgress(completed, products.length);
+      if ((index + 1) % 4 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
     }
   }
   for (let page = 2; page <= doc.getNumberOfPages(); page++) {
@@ -450,31 +455,24 @@ async function createCatalogPdf(products, title, options = {}) {
   return doc;
 }
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 30000);
-}
-
 async function withPdfButton(button, task) {
   button.disabled = true;
   const original = button.innerHTML;
-  button.textContent = "Preparando PDF…";
-  try { await task(); }
+  const progress = (done, total) => {
+    const percent = total ? Math.min(100, Math.round(done / total * 100)) : 0;
+    button.textContent = "Preparando PDF " + percent + "%…";
+  };
+  button.textContent = "Preparando PDF 0%…";
+  try { await task(progress); }
   catch (error) { showToast(error.message || "Não foi possível gerar o PDF."); }
   finally { button.disabled = false; button.innerHTML = original; }
 }
 
 function buildPrintCatalog() {
   const button = $("#generatePdfButton");
-  withPdfButton(button, async () => {
+  withPdfButton(button, async (progress) => {
     const products = state.products.filter((product) => product.status === "active");
-    const doc = await createCatalogPdf(products, "Catálogo completo");
+    const doc = await createCatalogPdf(products, "Catálogo completo", { onProgress: progress });
     doc.save("ostenty-catalogo-" + new Date().toISOString().slice(0, 10) + ".pdf");
     showToast("PDF completo baixado.");
   });
@@ -482,30 +480,24 @@ function buildPrintCatalog() {
 
 function buildCategoryPrintCatalogs() {
   const button = $("#generateCategoryPdfButton");
-  withPdfButton(button, async () => {
+  withPdfButton(button, async (progress) => {
     const chosen = $$(".pdf-category:checked").map((checkbox) => checkbox.value);
     const all = $("#pdfAllCategories").checked;
     const categories = all || chosen.length === CATEGORIES.length ? CATEGORIES : chosen;
     if (!categories.length) throw new Error("Selecione pelo menos uma categoria.");
-    const active = state.products.filter((product) => product.status === "active");
-    const available = categories.map((category) => ({ category, products: active.filter((product) => product.category === category) })).filter((item) => item.products.length);
-    if (!available.length) throw new Error("Não há produtos ativos nas categorias selecionadas.");
-    const zip = new window.JSZip();
-    for (const item of available) {
-      const doc = await createCatalogPdf(item.products, item.category);
-      zip.file("ostenty-" + safeFileName(item.category) + ".pdf", doc.output("blob"));
-    }
-    const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 5 } });
-    downloadBlob(blob, "ostenty-catalogos-por-categoria-" + new Date().toISOString().slice(0, 10) + ".zip");
-    showToast(available.length + " PDF(s) por categoria baixados em um ZIP.");
+    const products = state.products.filter((product) => product.status === "active" && categories.includes(product.category));
+    if (!products.length) throw new Error("Não há produtos ativos nas categorias selecionadas.");
+    const doc = await createCatalogPdf(products, "Categorias selecionadas", { onProgress: progress });
+    doc.save("ostenty-categorias-" + new Date().toISOString().slice(0, 10) + ".pdf");
+    showToast("PDF das categorias selecionadas baixado.");
   });
 }
 
 function buildIndividualPdf(product) {
   if (!product || product.status !== "active") { showToast("Apenas produtos ativos podem gerar PDF."); return; }
   const button = document.querySelector('[data-print-product="' + CSS.escape(product.id) + '"]');
-  withPdfButton(button || $("#generatePdfButton"), async () => {
-    const doc = await createCatalogPdf([product], product.name, { individual: true });
+  withPdfButton(button || $("#generatePdfButton"), async (progress) => {
+    const doc = await createCatalogPdf([product], product.name, { individual: true, onProgress: progress });
     doc.save("ostenty-" + safeFileName(product.code) + ".pdf");
     showToast("PDF de " + product.name + " baixado.");
   });

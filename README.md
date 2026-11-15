@@ -20,4 +20,4 @@ As fotos iniciais estão em `frontend/assets/products/`, separadas por categoria
 
 ## PDFs
 
-No painel, gere catálogos completos ou PDFs individuais diretamente para download. A opção por categoria baixa um ZIP com um PDF separado para cada categoria selecionada.
+No painel, gere catálogos completos, PDFs com as categorias marcadas ou PDFs individuais diretamente para download.
