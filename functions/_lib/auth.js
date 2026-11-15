@@ -72,7 +72,8 @@ export async function createSession(email, env) {
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_DAYS * 86400;
   await env.DB.prepare("INSERT INTO admin_sessions (token_hash, email, expires_at) VALUES (?, ?, ?)")
     .bind(await tokenHash(token), email, expiresAt).run();
-  const cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_DAYS * 86400}`;
+  // Access returns to this endpoint through a cross-site top-level GET, so Strict would drop the session cookie.
+  const cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}`;
   return cookie;
 }
 
@@ -120,5 +121,5 @@ export async function verifyCloudflareAccessToken(token, env) {
 }
 
 export function clearSessionCookie() {
-  return `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
+  return `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 }
