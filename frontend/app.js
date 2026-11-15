@@ -541,3 +541,37 @@ $("#generatePdfButton").addEventListener("click", buildPrintCatalog);
 $("#generateCategoryPdfButton").addEventListener("click", buildCategoryPrintCatalogs);
 
 renderCategoryFilters(); routeFromHash(); renderAdmin();
+
+const installAppButton = $("#installAppButton");
+let deferredInstallPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  installAppButton.classList.add("install-ready");
+});
+
+installAppButton.addEventListener("click", async () => {
+  if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone) {
+    showToast("O app OSTENTY já está instalado neste aparelho.");
+    return;
+  }
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const choice = await deferredInstallPrompt.userChoice;
+    if (choice.outcome === "accepted") showToast("App OSTENTY instalado.");
+    deferredInstallPrompt = null;
+    return;
+  }
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  showToast(isIos ? "No Safari, toque em Compartilhar e escolha Adicionar à Tela de Início." : "No menu do navegador, escolha Instalar app ou Adicionar à tela inicial.");
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  showToast("App OSTENTY instalado.");
+});
+
+if ("serviceWorker" in navigator && window.location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch((error) => console.warn("Não foi possível ativar o modo app offline.", error)));
+}

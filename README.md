@@ -18,6 +18,10 @@ Abra o site servido na porta 3000. Acesse **Administração** para cadastrar, ed
 
 As fotos iniciais estão em `frontend/assets/products/`, separadas por categoria e acabamento. Na primeira visita, o navegador importa os produtos da lista inicial para o catálogo local. Os nomes e códigos são provisórios, derivados dos nomes das fotos; preços ficam como “Preço sob consulta” até serem preenchidos no painel.
 
+## Instalar no celular
+
+O site é um PWA instalável. Abra o domínio Netlify em um navegador compatível e toque em **Instalar app**. No iPhone/iPad, abra no Safari, toque em **Compartilhar** e escolha **Adicionar à Tela de Início**. O app mantém o catálogo local disponível offline e guarda em cache até 120 fotos que já foram abertas.
+
 ## PDFs
 
 No painel, gere catálogos completos, PDFs com as categorias marcadas ou PDFs individuais diretamente para download.
