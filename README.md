@@ -22,6 +22,10 @@ As fotos iniciais estão em `frontend/assets/products/`, separadas por categoria
 
 O site é um PWA instalável. Abra o domínio Netlify em um navegador compatível e toque em **Instalar app**. No iPhone/iPad, abra no Safari, toque em **Compartilhar** e escolha **Adicionar à Tela de Início**. O app mantém o catálogo local disponível offline e guarda em cache até 120 fotos que já foram abertas.
 
+## Hospedar no Cloudflare Pages
+
+Importe este repositório no Cloudflare Pages e selecione a branch `main`, preset `None`, comando de build `echo static` e diretório de saída `.`. O arquivo `_redirects` encaminha a página inicial para o frontend; o service worker fica na raiz para permitir a instalação do PWA. O Cloudflare Pages não adiciona selo de marca ao site.
+
 ## PDFs
 
 No painel, gere catálogos completos, PDFs com as categorias marcadas ou PDFs individuais diretamente para download.
