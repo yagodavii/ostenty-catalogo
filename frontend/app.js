@@ -316,6 +316,24 @@ function loadPdfImage(url) {
   return task;
 }
 
+async function preloadPdfImages(products, onProgress) {
+  const imageProducts = products.filter((product) => product.image);
+  if (!imageProducts.length) return;
+  let nextIndex = 0;
+  let completed = 0;
+  const workerCount = Math.min(8, imageProducts.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < imageProducts.length) {
+      const product = imageProducts[nextIndex++];
+      await loadPdfImage(product.image);
+      completed++;
+      onProgress(completed);
+      if (completed % 12 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  });
+  await Promise.all(workers);
+}
+
 function addPdfBrand(doc, category, pageLabel = "") {
   const pageWidth = doc.internal.pageSize.getWidth();
   doc.setTextColor(...PDF_COLORS.ink);
@@ -402,10 +420,10 @@ async function createCatalogPdf(products, title, options = {}) {
   if (!products.length) throw new Error("Não há produtos para gerar este PDF.");
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
   const onProgress = options.onProgress || (() => {});
-  onProgress(0, products.length);
+  onProgress(0);
   if (options.individual || products.length === 1) {
     await addPdfIndividual(doc, products[0]);
-    onProgress(1, 1);
+    onProgress(99);
     return doc;
   }
   const grouped = [...new Set(products.map((product) => product.category))]
@@ -428,7 +446,12 @@ async function createCatalogPdf(products, title, options = {}) {
   doc.setTextColor(...PDF_COLORS.muted);
   doc.text("Seu brilho, sua essência.  ·  " + new Date().toLocaleDateString("pt-BR"), pageWidth / 2, 146, { align: "center" });
 
+  let completedProducts = 0;
+  let preloadedProducts = 0;
   for (const group of grouped) {
+    await preloadPdfImages(group.products, (loaded) => {
+      onProgress(Math.round(((preloadedProducts + loaded) / products.length) * 55));
+    });
     doc.addPage();
     addPdfBrand(doc, group.category, title);
     for (let index = 0; index < group.products.length; index++) {
@@ -442,10 +465,12 @@ async function createCatalogPdf(products, title, options = {}) {
       const x = 14 + column * 93;
       const y = 33 + row * 84;
       await addPdfProductCard(doc, group.products[index], x, y, 88, 79);
-      const completed = grouped.slice(0, grouped.indexOf(group)).reduce((count, item) => count + item.products.length, 0) + index + 1;
-      onProgress(completed, products.length);
+      completedProducts++;
+      onProgress(Math.min(99, 55 + Math.floor((completedProducts / products.length) * 44)));
       if ((index + 1) % 4 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
     }
+    preloadedProducts += group.products.length;
+    group.products.forEach((product) => { if (product.image) pdfImageCache.delete(product.image); });
   }
   for (let page = 2; page <= doc.getNumberOfPages(); page++) {
     doc.setPage(page);
@@ -460,14 +485,11 @@ async function createCatalogPdf(products, title, options = {}) {
 async function withPdfButton(button, task) {
   button.disabled = true;
   const original = button.innerHTML;
-  const progress = (done, total) => {
-    const percent = total ? Math.min(100, Math.round(done / total * 100)) : 0;
-    button.textContent = "Preparando PDF " + percent + "%…";
-  };
+  const progress = (percent) => { button.textContent = "Preparando PDF " + Math.max(0, Math.min(100, percent)) + "%…"; };
   button.textContent = "Preparando PDF 0%…";
   try { await task(progress); }
   catch (error) { showToast(error.message || "Não foi possível gerar o PDF."); }
-  finally { button.disabled = false; button.innerHTML = original; }
+  finally { pdfImageCache.clear(); button.disabled = false; button.innerHTML = original; }
 }
 
 function buildPrintCatalog() {
@@ -476,6 +498,7 @@ function buildPrintCatalog() {
     const products = state.products.filter((product) => product.status === "active");
     const doc = await createCatalogPdf(products, "Catálogo completo", { onProgress: progress });
     doc.save("ostenty-catalogo-" + new Date().toISOString().slice(0, 10) + ".pdf");
+    progress(100);
     showToast("PDF completo baixado.");
   });
 }
@@ -491,6 +514,7 @@ function buildCategoryPrintCatalogs() {
     if (!products.length) throw new Error("Não há produtos ativos nas categorias selecionadas.");
     const doc = await createCatalogPdf(products, "Categorias selecionadas", { onProgress: progress });
     doc.save("ostenty-categorias-" + new Date().toISOString().slice(0, 10) + ".pdf");
+    progress(100);
     showToast("PDF das categorias selecionadas baixado.");
   });
 }
@@ -501,6 +525,7 @@ function buildIndividualPdf(product) {
   withPdfButton(button || $("#generatePdfButton"), async (progress) => {
     const doc = await createCatalogPdf([product], product.name, { individual: true, onProgress: progress });
     doc.save("ostenty-" + safeFileName(product.code) + ".pdf");
+    progress(100);
     showToast("PDF de " + product.name + " baixado.");
   });
 }
