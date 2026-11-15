@@ -84,6 +84,12 @@ em { color: #b97293; font-style: italic; }
 .search-field { height: 48px; width: 260px; }
 .search-field span, .mini-search span { font-size: 23px; color: var(--rose); line-height: 0; transform: rotate(-15deg); }
 .search-field input, .mini-search input { border: 0; outline: 0; background: transparent; min-width: 0; color: var(--ink); font-size: 12px; width: 100%; }
+.search-control { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.catalog-search-control { width: min(100%, 380px); }
+.search-control input { min-width: 0; flex: 1; height: 46px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; outline: none; background: var(--white); color: var(--ink); font-size: 12px; }
+.search-control input:focus { border-color: var(--rose); }
+.search-button { min-height: 42px; padding: 0 17px; white-space: nowrap; }
+.admin-search-control { width: 310px; }
 .category-filter { display: flex; gap: 7px; flex: 1; overflow-x: auto; padding-bottom: 3px; }
 .filter-chip { flex: 0 0 auto; border: 1px solid transparent; background: transparent; color: var(--ink-soft); border-radius: 999px; padding: 11px 13px; font-size: 11px; }
 .filter-chip.active, .filter-chip:hover { background: var(--ink); color: var(--white); }
@@ -92,7 +98,7 @@ em { color: #b97293; font-style: italic; }
 .product-card { min-width: 0; position: relative; background: var(--white); border-radius: 16px; overflow: hidden; transition: transform .22s, box-shadow .22s; }
 .product-card:hover { transform: translateY(-5px); box-shadow: var(--shadow); }
 .product-photo { height: 260px; position: relative; background: linear-gradient(145deg, #fceaf2, #e8d5c5); display: grid; place-items: center; overflow: hidden; }
-.product-photo img { width: 100%; height: 100%; object-fit: cover; }
+.product-photo img { width: 100%; height: 100%; padding: 8px; object-fit: contain; background: #fff; }
 .product-placeholder { color: rgba(185, 114, 147, .62); font-size: 40px; }
 .product-photo .category-stamp { position: absolute; left: 12px; top: 12px; background: rgba(255,255,255,.78); color: #a25f7e; padding: 6px 8px; border-radius: 999px; font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
 .select-product { position: absolute; right: 12px; top: 12px; width: 30px; height: 30px; border: 1px solid rgba(8,5,8,.15); border-radius: 50%; background: rgba(255,255,255,.82); font-size: 16px; color: #a25f7e; }
@@ -150,7 +156,7 @@ td:first-child { font-weight: 700; }
 td small { display: block; color: #a25f7e; font-size: 9px; font-weight: 400; margin-top: 4px; }
 .table-product { display: flex; align-items: center; gap: 10px; }
 .table-thumb { width: 36px; height: 36px; border-radius: 9px; overflow: hidden; display: grid; place-items: center; background: var(--pink-pale); color: var(--rose); flex: 0 0 auto; }
-.table-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.table-thumb img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
 .status-badge { border-radius: 999px; padding: 6px 9px; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
 .status-badge.active { color: #66806a; background: #e9f3ea; }
 .status-badge.inactive { color: #927c5e; background: #f7f0df; }
@@ -174,9 +180,9 @@ td small { display: block; color: #a25f7e; font-size: 9px; font-weight: 400; mar
 .product-modal, .form-modal { max-height: calc(100vh - 40px); overflow: auto; position: relative; background: var(--white); border-radius: 20px; box-shadow: var(--shadow); }
 .product-modal { width: min(780px, 100%); display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; }
 .modal-image { min-height: 410px; background: linear-gradient(145deg, #fceaf2, #e8d5c5); display: grid; place-items: center; color: var(--rose); font-size: 60px; }
-.modal-image img { width: 100%; height: 100%; object-fit: cover; }
+.modal-image img { display: block; width: 100%; height: 100%; max-height: 520px; object-fit: contain; background: #fff; }
 .public-photo-gallery { width: 100%; height: 100%; min-height: 410px; padding: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-content: center; }
-.public-photo-gallery img { min-height: 145px; max-height: 205px; border-radius: 12px; background: var(--white); object-fit: cover; }
+.public-photo-gallery img { width: 100%; min-height: 145px; max-height: 205px; padding: 6px; border-radius: 12px; background: var(--white); object-fit: contain; }
 .public-photo-gallery img:first-child { grid-column: 1 / -1; max-height: 255px; }
 .modal-details { padding: 55px 43px; display: flex; flex-direction: column; justify-content: center; }
 .modal-details h2 { font-size: 43px; margin: 0 0 10px; }
@@ -226,9 +232,10 @@ label small { color: #a9959e; font-size: 9px; font-weight: 400; letter-spacing: 
 .toast.show { transform: translate(-50%, 0); opacity: 1; }
 .print-catalog { display: none; }
 @media print {
+  @page { size: A4; margin: 12mm; }
   body { background: white; }
   .app-shell > *:not(#printCatalog) { display: none !important; }
-  .print-catalog { display: block !important; padding: 22px; color: #080508; }
+  .print-catalog { display: block !important; padding: 0; color: #080508; }
   .print-cover { border-bottom: 2px solid #d99bb7; padding: 20px 0 24px; margin-bottom: 20px; }
   .print-brand { font-size: 18px; letter-spacing: .2em; font-weight: 700; }
   .print-brand small { display: block; font-size: 8px; letter-spacing: .4em; color: #b97293; margin-top: 4px; }
@@ -237,14 +244,14 @@ label small { color: #a9959e; font-size: 9px; font-weight: 400; letter-spacing: 
   .print-category { break-before: auto; margin: 25px 0 10px; font: 600 20px "Playfair Display", Georgia, serif; border-bottom: 1px solid #e8d5c5; padding-bottom: 7px; }
   .print-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
   .print-product { break-inside: avoid; padding-bottom: 13px; }
-  .print-product img, .print-placeholder-print { width: 100%; height: 130px; object-fit: cover; background: #fceaf2; display: grid; place-items: center; color: #d99bb7; }
+  .print-product img, .print-placeholder-print { width: 100%; height: 155px; object-fit: contain; background: #fff; display: grid; place-items: center; color: #d99bb7; }
   .print-product h4 { margin: 8px 0 3px; font-size: 12px; }
   .print-product p { margin: 0 0 3px; color: #6b5b63; font-size: 9px; line-height: 1.35; }
   .print-product strong { font-size: 10px; }
   .print-individual-sheet { min-height: 720px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; gap: 22px 36px; align-items: center; border: 1px solid #e8d5c5; padding: 34px; }
   .print-individual-brand { grid-column: 1 / -1; display: flex; align-items: end; justify-content: space-between; border-bottom: 1px solid #e8d5c5; padding-bottom: 18px; }
   .print-individual-visual { height: 430px; display: grid; place-items: center; background: #fceaf2; }
-  .print-individual-visual img, .print-individual-visual .print-placeholder-print { width: 100%; height: 100%; object-fit: cover; }
+  .print-individual-visual img, .print-individual-visual .print-placeholder-print { width: 100%; height: 100%; object-fit: contain; background: #fff; }
   .print-individual-info { padding: 14px 18px; }
   .print-category-label { color: #b97293; font-size: 10px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
   .print-individual-info h1 { font: 600 34px/1.05 "Playfair Display", Georgia, serif; margin: 15px 0 8px; }
@@ -276,7 +283,8 @@ label small { color: #a9959e; font-size: 9px; font-weight: 400; letter-spacing: 
   .page-heading { margin-top: 0; margin-bottom: 32px; }
   .heading-side { max-width: 100%; }
   .catalog-toolbar { align-items: stretch; }
-  .search-field { width: 100%; }
+  .catalog-search-control { width: 100%; }
+  .search-button { min-width: 104px; }
   .category-filter { order: 3; flex-basis: 100%; }
   .catalog-toolbar .button { margin-left: 0; }
   .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -297,7 +305,8 @@ label small { color: #a9959e; font-size: 9px; font-weight: 400; letter-spacing: 
   .stat-card strong { font-size: 34px; }
   .section-heading { display: block; }
   .table-tools { margin-top: 16px; flex-direction: column; }
-  .mini-search { width: 100%; }
+  .admin-search-control { width: 100%; }
+  .admin-search-control .search-button { min-width: 104px; }
   .table-tools select { height: 38px; padding: 0 12px; }
   .product-modal { grid-template-columns: 1fr; }
   .modal-image { min-height: 260px; }
