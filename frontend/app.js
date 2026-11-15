@@ -701,11 +701,18 @@ installAppButton.addEventListener("click", async () => {
     showToast("O app OSTENTY já está instalado neste aparelho.");
     return;
   }
+  if (!deferredInstallPrompt && "serviceWorker" in navigator) {
+    await Promise.race([
+      navigator.serviceWorker.ready.catch(() => null),
+      new Promise((resolve) => setTimeout(resolve, 1800)),
+    ]);
+  }
   if (deferredInstallPrompt) {
-    deferredInstallPrompt.prompt();
-    const choice = await deferredInstallPrompt.userChoice;
-    if (choice.outcome === "accepted") showToast("App OSTENTY instalado.");
+    const prompt = deferredInstallPrompt;
     deferredInstallPrompt = null;
+    await prompt.prompt();
+    const choice = await prompt.userChoice;
+    if (choice.outcome === "accepted") showToast("App OSTENTY instalado.");
     return;
   }
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
