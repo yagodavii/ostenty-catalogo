@@ -64,7 +64,7 @@ function getCookie(request, name) {
 }
 
 export function databaseReady(env) {
-  return Boolean(env.DB && env.ADMIN_TEMP_PASSWORD);
+  return Boolean(env.DB);
 }
 
 export async function createSession(email, env) {
@@ -81,13 +81,42 @@ export async function getSession(request, env) {
   if (!token) return null;
   const hash = await tokenHash(token);
   const session = await env.DB.prepare(
-    "SELECT s.email, s.expires_at, u.name, u.must_change FROM admin_sessions s JOIN admin_users u ON u.email = s.email WHERE s.token_hash = ?",
+    "SELECT s.email, s.expires_at, u.name, u.is_admin FROM admin_sessions s JOIN admin_users u ON u.email = s.email WHERE s.token_hash = ?",
   ).bind(hash).first();
   if (!session || session.expires_at <= Math.floor(Date.now() / 1000)) {
     if (session) await env.DB.prepare("DELETE FROM admin_sessions WHERE token_hash = ?").bind(hash).run();
     return null;
   }
-  return { email: session.email, name: session.name || "", mustChangePassword: Boolean(session.must_change) || !session.name, tokenHash: hash };
+  return { email: session.email, name: session.name || "", isAdmin: Boolean(session.is_admin) && ADMIN_EMAILS.has(session.email), tokenHash: hash };
+}
+
+function decodeBase64Url(value) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));
+}
+
+export async function verifyCloudflareAccessToken(token, env) {
+  const teamDomain = String(env.ACCESS_TEAM_DOMAIN || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const audience = String(env.ACCESS_AUD || "");
+  if (!teamDomain || !audience) throw new Error("Cloudflare Access ainda não está configurado.");
+  const [encodedHeader, encodedPayload, encodedSignature] = token.split(".");
+  if (!encodedHeader || !encodedPayload || !encodedSignature) throw new Error("Token do Cloudflare Access inválido.");
+  const header = JSON.parse(new TextDecoder().decode(decodeBase64Url(encodedHeader)));
+  const claims = JSON.parse(new TextDecoder().decode(decodeBase64Url(encodedPayload)));
+  if (header.alg !== "RS256" || typeof header.kid !== "string") throw new Error("Assinatura do Cloudflare Access inválida.");
+  const keyResponse = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`, { cf: { cacheTtl: 3600 } });
+  if (!keyResponse.ok) throw new Error("Não foi possível validar o código do Cloudflare Access.");
+  const keySet = await keyResponse.json();
+  const jwk = keySet.keys?.find((key) => key.kid === header.kid);
+  if (!jwk) throw new Error("Chave do Cloudflare Access não encontrada.");
+  const publicKey = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+  const signedContent = new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`);
+  const signatureValid = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, decodeBase64Url(encodedSignature), signedContent);
+  const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  if (!signatureValid || claims.iss !== `https://${teamDomain}` || !audiences.includes(audience) || claims.exp <= Math.floor(Date.now() / 1000)) {
+    throw new Error("A verificação de identidade do Cloudflare Access falhou.");
+  }
+  return normalizeEmail(claims.email);
 }
 
 export function clearSessionCookie() {

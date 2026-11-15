@@ -6,16 +6,16 @@ export async function onRequestPost({ request, env }) {
   const email = normalizeEmail(body?.email);
   const name = typeof body?.name === "string" ? body.name.trim().replace(/\s+/g, " ") : "";
   const password = body?.password;
-  if (!ADMIN_EMAILS.has(email)) return json({ error: "Este e-mail não está autorizado a criar acesso administrativo." }, 403);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Informe um e-mail válido." }, 400);
   if (name.length < 2 || name.length > 80) return json({ error: "Informe um nome entre 2 e 80 caracteres." }, 400);
-  if (typeof password !== "string" || password !== env.ADMIN_TEMP_PASSWORD) {
-    return json({ error: "Senha temporária incorreta. Solicite a senha de ativação ao responsável pelo sistema." }, 401);
+  if (typeof password !== "string" || password.length < 10 || password.length > 256) {
+    return json({ error: "A senha precisa ter entre 10 e 256 caracteres." }, 400);
   }
   const existing = await env.DB.prepare("SELECT email FROM admin_users WHERE email = ?").bind(email).first();
   if (existing) return json({ error: "Este e-mail já tem acesso. Entre com sua senha." }, 409);
   const credentials = await hashPassword(password);
-  await env.DB.prepare("INSERT INTO admin_users (email, name, password_hash, password_salt, must_change, created_at) VALUES (?, ?, ?, ?, 1, ?)")
+  await env.DB.prepare("INSERT INTO admin_users (email, name, password_hash, password_salt, must_change, created_at, is_admin) VALUES (?, ?, ?, ?, 0, ?, 0)")
     .bind(email, name, credentials.hash, credentials.salt, Math.floor(Date.now() / 1000)).run();
   const cookie = await createSession(email, env);
-  return json({ authenticated: true, email, name, mustChangePassword: true }, 201, { "set-cookie": cookie });
+  return json({ authenticated: true, email, name, isAdmin: false, requiresAdminVerification: ADMIN_EMAILS.has(email) }, 201, { "set-cookie": cookie });
 }

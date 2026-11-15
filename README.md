@@ -1,6 +1,6 @@
 # OSTENTY SEMIJOIAS — Catálogo digital
 
-Catálogo digital responsivo com painel administrativo aberto e armazenamento local no navegador (`localStorage`). Não requer banco de dados nem credenciais de administrador.
+Catálogo digital responsivo com contas de acesso, painel administrativo e armazenamento local no navegador (`localStorage`).
 
 ## Estrutura
 
@@ -28,15 +28,16 @@ Importe este repositório no Cloudflare Pages e selecione a branch `main`, prese
 
 ## Configurar acesso administrativo no Cloudflare
 
-O painel usa Cloudflare Pages Functions e D1 para restringir a autenticação aos três e-mails autorizados no código. Para ativar o login:
+O login usa Pages Functions e D1. As contas recebem uma senha pessoal; o Cloudflare Access verifica por código os e-mails ADM antes de liberar o painel.
 
-1. Em **Workers & Pages → D1 SQL Database**, crie um banco chamado `ostenty-admin-auth`.
-2. No projeto Pages, abra **Settings → Functions → D1 database bindings**, adicione o banco criado com o nome de variável `DB` e salve.
-3. No console do D1, execute o conteúdo de `migrations/0001_admin_auth.sql` e, se já havia criado as tabelas, execute também `migrations/0002_admin_user_name.sql`.
-4. Em **Settings → Environment variables**, crie `ADMIN_TEMP_PASSWORD` como secret com a senha temporária que será compartilhada apenas com os três administradores.
-5. Aguarde um novo deploy do Pages. No primeiro acesso, cada administrador entra ou cria o acesso usando o e-mail autorizado e a senha temporária; o sistema exige a troca por uma senha própria.
+1. Em **Workers & Pages → D1 SQL Database**, crie o banco `ostenty-admin-auth` se ainda não existir.
+2. No projeto Pages, abra **Settings → Functions → D1 database bindings** e vincule o banco como `DB`.
+3. No console do D1, execute `migrations/0001_admin_auth.sql`, `migrations/0002_admin_user_name.sql` e `migrations/0003_admin_access.sql` conforme necessário.
+4. Em **Zero Trust → Access → Applications**, crie uma aplicação Self-hosted para `ostenty-catalogo.pages.dev` e o caminho `/api/auth/admin-verify`. Configure uma política Allow para os três e-mails ADM e habilite **One-time PIN**.
+5. Copie o **AUD tag** dessa aplicação e o domínio da equipe (`<equipe>.cloudflareaccess.com`). No projeto Pages, em **Settings → Variables and secrets**, cadastre `ACCESS_AUD` e `ACCESS_TEAM_DOMAIN` para Production.
+6. Remova o secret antigo `ADMIN_TEMP_PASSWORD`, que não é mais usado, e faça um novo deploy.
 
-As contas permitidas são `yagodavi012@hotmail.com`, `juliamendesperes@gmail.com` e `ostentysemijoiasbr@gmail.com`. O servidor valida esses endereços, armazena senhas com PBKDF2 e mantém sessões em cookie HTTP-only. O catálogo público continua acessível sem login.
+Qualquer pessoa pode criar uma conta com nome, e-mail e senha própria. Depois do login, contas comuns acessam Início e Catálogo. O servidor libera o painel somente após validar a confirmação do Cloudflare Access para os e-mails ADM, mantidos apenas no código do servidor. Senhas são armazenadas com PBKDF2 e as sessões usam cookie HTTP-only.
 
 ## PDFs
 
