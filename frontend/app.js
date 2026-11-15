@@ -1,7 +1,7 @@
 const CATEGORIES = ["Colares", "Brincos", "Argolas", "Anéis", "Conjuntos", "Pingentes", "Pulseiras"];
 const STORAGE_KEY = "ostenty_catalog_products_v1";
-const SESSION_KEY = "ostenty_admin_session_v1";
-const API_BASE = "/api";
+const SEED_VERSION_KEY = "ostenty_catalog_seed_version";
+const SEED_VERSION = "photos-2026-11-v1";
 
 const state = {
   products: loadProducts(),
@@ -22,41 +22,35 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
 function loadProducts() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { saved = []; }
+  const seed = window.OSTENTY_SEED_PRODUCTS || [];
+  if (localStorage.getItem(SEED_VERSION_KEY) !== SEED_VERSION) {
+    const knownIds = new Set(saved.map((product) => product.id));
+    saved = [...saved, ...seed.filter((product) => !knownIds.has(product.id))];
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      localStorage.setItem(SEED_VERSION_KEY, SEED_VERSION);
+    } catch (error) { console.warn("Não foi possível salvar a migração do catálogo neste navegador.", error); }
+  }
+  return saved.length ? saved : seed;
 }
 
 function saveProducts() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.products));
 }
 
-async function apiRequest(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, { credentials: "include", headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || `Falha na API (${response.status}).`);
-  return payload;
-}
-
-async function tryApi(path, options = {}) {
-  try { return await apiRequest(path, options); } catch (error) { console.warn("OSTENTY API:", error.message); return null; }
-}
-
-async function refreshProductsFromApi() {
-  const query = isAdmin() ? "?includeInactive=1" : "";
-  const result = await tryApi(`/products${query}`);
-  if (result?.products) { state.products = result.products; saveProducts(); renderCatalog(); if (isAdmin()) renderAdmin(); }
-  return result;
-}
-
 function uid() { return `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`; }
 function escapeHtml(value = "") { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char])); }
 function formatPrice(value) {
+  if (value === null || value === undefined || value === "") return "Preço sob consulta";
   const number = Number(String(value).replace(/[^0-9,.-]/g, "").replace(".", "").replace(",", "."));
   if (!Number.isFinite(number)) return "Preço sob consulta";
   return number.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 function normalizePrice(value) {
   const text = String(value ?? "").trim().replace(/R\$\s?/i, "");
-  if (!text) return 0;
+  if (!text) return null;
   const parsed = text.includes(",") ? text.replace(/\./g, "").replace(",", ".") : text;
   return Number(parsed.replace(/[^0-9.-]/g, "")) || 0;
 }
@@ -200,18 +194,14 @@ async function saveManagedPhotos() {
   if (!product) return;
   const images = state.photoDraft;
   const primary = images.find((item) => item.url === state.photoPrimaryUrl)?.url || images[0]?.url || "";
-  try {
-    const result = await apiRequest(`/products?id=${encodeURIComponent(product.id)}`, { method: "PUT", body: JSON.stringify({ images, image: primary }) });
-    const savedProduct = result.product;
-    state.products = state.products.map((item) => item.id === savedProduct.id ? savedProduct : item);
-    saveProducts();
-    closeModals();
-    renderAdmin();
-    renderCatalog();
-    showToast("Fotos atualizadas no catálogo.");
-  } catch (error) {
-    showToast(error.message || "Não foi possível salvar as fotos.");
-  }
+  product.images = images;
+  product.image = primary;
+  product.additionalImages = images.filter((item) => item.url !== primary).map((item) => item.url);
+  saveProducts();
+  closeModals();
+  renderAdmin();
+  renderCatalog();
+  showToast("Fotos atualizadas neste navegador.");
 }
 
 function closeModals() { $$(".modal-backdrop").forEach((modal) => modal.classList.add("hidden")); }
@@ -322,8 +312,8 @@ document.addEventListener("click", async (event) => {
   if (target.matches("[data-photo-delete]")) { const index = Number(target.dataset.photoDelete); const removed = state.photoDraft.splice(index, 1)[0]; if (removed?.url === state.photoPrimaryUrl) state.photoPrimaryUrl = state.photoDraft[0]?.url || ""; renderPhotoManager(); return; }
   if (target.matches("[data-edit-product]")) { openProductModal(state.products.find((product) => product.id === target.dataset.editProduct)); return; }
   if (target.matches("[data-print-product]")) { buildIndividualPdf(state.products.find((product) => product.id === target.dataset.printProduct)); return; }
-  if (target.matches("[data-toggle-product]")) { const product = state.products.find((item) => item.id === target.dataset.toggleProduct); if (product) { const nextStatus = product.status === "active" ? "inactive" : "active"; const result = await tryApi(`/products?id=${encodeURIComponent(product.id)}`, { method: "PUT", body: JSON.stringify({ ...product, status: nextStatus }) }); product.status = result?.product?.status || nextStatus; saveProducts(); renderAdmin(); renderCatalog(); showToast(product.status === "active" ? "Produto ativado." : "Produto ocultado do catálogo."); } return; }
-  if (target.matches("[data-delete-product]")) { const product = state.products.find((item) => item.id === target.dataset.deleteProduct); if (product && window.confirm(`Excluir “${product.name}”?`)) { await tryApi(`/products?id=${encodeURIComponent(product.id)}`, { method: "DELETE" }); state.products = state.products.filter((item) => item.id !== product.id); state.selected.delete(product.id); saveProducts(); renderAdmin(); renderCatalog(); showToast("Produto excluído."); } return; }
+  if (target.matches("[data-toggle-product]")) { const product = state.products.find((item) => item.id === target.dataset.toggleProduct); if (product) { const nextStatus = product.status === "active" ? "inactive" : "active"; product.status = nextStatus; saveProducts(); renderAdmin(); renderCatalog(); showToast(product.status === "active" ? "Produto ativado." : "Produto ocultado do catálogo."); } return; }
+  if (target.matches("[data-delete-product]")) { const product = state.products.find((item) => item.id === target.dataset.deleteProduct); if (product && window.confirm(`Excluir “${product.name}”?`)) { state.products = state.products.filter((item) => item.id !== product.id); state.selected.delete(product.id); saveProducts(); renderAdmin(); renderCatalog(); showToast("Produto excluído."); } return; }
   if (target.matches("[data-close-modal]")) closeModals();
 });
 
@@ -337,10 +327,10 @@ $("#openImportButton").addEventListener("click", () => { state.importRows = []; 
 $("#photoAddInput").addEventListener("change", async (event) => { const files = [...event.target.files]; if (state.photoReplaceIndex !== null) await replacePhotoFile(files[0]); else await addPhotoFiles(files); event.target.value = ""; event.target.multiple = true; });
 $("#savePhotosButton").addEventListener("click", saveManagedPhotos);
 
-$("#productForm").addEventListener("submit", async (event) => { event.preventDefault(); const id = $("#productId").value || uid(); const existing = state.products.find((product) => product.id === id); const code = $("#productCode").value.trim(); if (state.products.some((product) => product.code.toLowerCase() === code.toLowerCase() && product.id !== id)) { showToast("Esse código já está cadastrado."); return; } let image = existing?.image || ""; const file = $("#productImage").files[0]; if (file) image = await readFileAsDataUrl(file); const product = { id, code, name: $("#productName").value.trim(), description: $("#productDescription").value.trim(), price: normalizePrice($("#productPrice").value), category: $("#productCategory").value, status: $("#productStatus").value, image, additionalImages: $("#productAdditionalImages").value.split("\n").map((item) => item.trim()).filter(Boolean) }; const result = await tryApi(existing ? `/products?id=${encodeURIComponent(id)}` : "/products", { method: existing ? "PUT" : "POST", body: JSON.stringify(product) }); const savedProduct = result?.product || product; if (existing) state.products = state.products.map((item) => item.id === id ? savedProduct : item); else state.products.push(savedProduct); saveProducts(); closeModals(); renderAdmin(); renderCatalog(); showToast(existing ? "Produto atualizado." : "Produto cadastrado."); });
+$("#productForm").addEventListener("submit", async (event) => { event.preventDefault(); const id = $("#productId").value || uid(); const existing = state.products.find((product) => product.id === id); const code = $("#productCode").value.trim(); if (state.products.some((product) => product.code.toLowerCase() === code.toLowerCase() && product.id !== id)) { showToast("Esse código já está cadastrado."); return; } let image = existing?.image || ""; const file = $("#productImage").files[0]; if (file) image = await readFileAsDataUrl(file); const product = { id, code, name: $("#productName").value.trim(), description: $("#productDescription").value.trim(), price: normalizePrice($("#productPrice").value), category: $("#productCategory").value, status: $("#productStatus").value, image, additionalImages: $("#productAdditionalImages").value.split("\n").map((item) => item.trim()).filter(Boolean) }; if (existing) state.products = state.products.map((item) => item.id === id ? product : item); else state.products.push(product); saveProducts(); closeModals(); renderAdmin(); renderCatalog(); showToast(existing ? "Produto atualizado." : "Produto cadastrado."); });
 $("#csvInput").addEventListener("change", async (event) => { const file = event.target.files[0]; if (!file) return; const rows = parseCsv(await file.text()); const seenCodes = new Set(); state.importRows = rows.map((raw, index) => { const row = mapImportRow(raw, index); const normalizedCode = row.code.toLowerCase(); if (normalizedCode && seenCodes.has(normalizedCode)) { row.duplicate = true; row.valid = false; row.issue = "Código duplicado na planilha"; } if (normalizedCode) seenCodes.add(normalizedCode); return row; }); renderImportPreview(); });
 $("#imageFolderInput").addEventListener("change", async (event) => { const files = [...event.target.files]; state.importedImages = {}; await Promise.all(files.map(async (file) => { const name = file.name.replace(/\.[^.]+$/, "").toLowerCase(); state.importedImages[name] = await readFileAsDataUrl(file); })); showToast(`${files.length} foto(s) relacionada(s) à importação.`); });
-$("#confirmImportButton").addEventListener("click", async () => { const validRows = state.importRows.filter((row) => row.valid).map((row) => ({ id: uid(), code: row.code, name: row.name, description: row.description, price: row.price, category: row.category, status: row.status, image: row.image || state.importedImages[row.code.toLowerCase()] || "", additionalImages: [] })); const result = await tryApi("/import", { method: "POST", body: JSON.stringify(validRows) }); const imported = result?.products || validRows; imported.forEach((product) => state.products.push(product)); saveProducts(); closeModals(); renderAdmin(); renderCatalog(); showToast(`${result?.imported ?? imported.length} produto(s) importado(s).`); });
+$("#confirmImportButton").addEventListener("click", async () => { const validRows = state.importRows.filter((row) => row.valid).map((row) => ({ id: uid(), code: row.code, name: row.name, description: row.description, price: row.price, category: row.category, status: row.status, image: row.image || state.importedImages[row.code.toLowerCase()] || "", additionalImages: [] })); const imported = validRows; imported.forEach((product) => state.products.push(product)); saveProducts(); closeModals(); renderAdmin(); renderCatalog(); showToast(`${imported.length} produto(s) importado(s).`); });
 $("#shareSelectionButton").addEventListener("click", () => { const products = state.products.filter((product) => state.selected.has(product.id)); if (!products.length) { showToast("Selecione pelo menos uma peça para compartilhar."); return; } const message = `Olá! Gostaria de saber mais sobre estas peças OSTENTY:%0A%0A${products.map((product) => `• ${product.name} — código ${product.code}`).join("%0A")}`; window.open(`https://wa.me/?text=${message}`, "_blank", "noopener"); });
 $("#modalSelectButton").addEventListener("click", () => { const id = $("#modalSelectButton").dataset.productId; state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id); openProductDetail(state.products.find((product) => product.id === id)); renderCatalog(); });
 $("#generatePdfButton").addEventListener("click", buildPrintCatalog);
