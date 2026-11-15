@@ -11,6 +11,11 @@ const state = {
   activeProductId: null,
   importRows: [],
   importedImages: {},
+  photoProductId: null,
+  photoDraft: [],
+  photoPrimaryUrl: "",
+  photoReplaceIndex: null,
+  adminAuthenticated: false,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -60,7 +65,20 @@ function showToast(message) {
   toast.textContent = message; toast.classList.add("show");
   window.clearTimeout(showToast.timer); showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2800);
 }
-function isAdmin() { return localStorage.getItem(SESSION_KEY) === "true"; }
+function isAdmin() { return state.adminAuthenticated === true; }
+
+async function restoreAdminSession() {
+  try {
+    const result = await apiRequest("/auth");
+    state.adminAuthenticated = Boolean(result.authenticated);
+  } catch {
+    state.adminAuthenticated = false;
+  }
+  if (window.location.hash === "#admin") {
+    await refreshProductsFromApi();
+    renderAdmin();
+  }
+}
 
 function setView(view) {
   const views = { landing: "#landingView", catalog: "#catalogView", admin: "#adminView" };
@@ -88,6 +106,19 @@ function productImage(product, className = "") {
   return product.image ? `<img class="${className}" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" />` : `<span class="product-placeholder ${className}">✦</span>`;
 }
 
+function getProductImages(product) {
+  const source = Array.isArray(product?.images) && product.images.length
+    ? product.images
+    : [product?.image, ...(Array.isArray(product?.additionalImages) ? product.additionalImages : [])];
+  const seen = new Set();
+  return source.map((item) => {
+    const url = typeof item === "string" ? item : item?.url;
+    if (!url || seen.has(url)) return null;
+    seen.add(url);
+    return { id: typeof item === "object" && item?.id ? item.id : uid(), url };
+  }).filter(Boolean);
+}
+
 function filteredProducts() {
   const query = $("#catalogSearch")?.value.trim().toLowerCase() || "";
   return state.products.filter((product) => product.status === "active" && (state.catalogCategory === "all" || product.category === state.catalogCategory) && (!query || `${product.name} ${product.code}`.toLowerCase().includes(query)));
@@ -112,7 +143,7 @@ function renderAdmin() {
   $("#statActive").textContent = state.products.filter((product) => product.status === "active").length;
   $("#statTotal").textContent = state.products.length;
   $("#statSelected").textContent = state.selected.size;
-  $("#adminTableBody").innerHTML = products.map((product) => `<tr><td><div class="table-product"><div class="table-thumb">${product.image ? `<img src="${escapeHtml(product.image)}" alt="" />` : "✦"}</div><span>${escapeHtml(product.name)}<small>${escapeHtml(product.description || "Sem descrição")}</small></span></div></td><td>${escapeHtml(product.code)}</td><td>${escapeHtml(product.category)}</td><td>${formatPrice(product.price)}</td><td><span class="status-badge ${product.status}">${product.status === "active" ? "Ativo" : "Inativo"}</span></td><td><div class="row-actions">${product.status === "active" ? `<button title="Gerar PDF individual" data-print-product="${product.id}">PDF</button>` : ""}<button title="Editar" data-edit-product="${product.id}">Editar</button><button title="Ativar ou desativar" data-toggle-product="${product.id}">${product.status === "active" ? "Ocultar" : "Ativar"}</button><button title="Excluir" data-delete-product="${product.id}">Excluir</button></div></td></tr>`).join("");
+  $("#adminTableBody").innerHTML = products.map((product) => `<tr><td><div class="table-product"><div class="table-thumb">${product.image ? `<img src="${escapeHtml(product.image)}" alt="" />` : "✦"}</div><span>${escapeHtml(product.name)}<small>${escapeHtml(product.description || "Sem descrição")}</small></span></div></td><td>${escapeHtml(product.code)}</td><td>${escapeHtml(product.category)}</td><td>${formatPrice(product.price)}</td><td><span class="status-badge ${product.status}">${product.status === "active" ? "Ativo" : "Inativo"}</span></td><td><div class="row-actions"><button title="Gerenciar fotos" data-manage-photos="${product.id}">Fotos</button>${product.status === "active" ? `<button title="Gerar PDF individual" data-print-product="${product.id}">PDF</button>` : ""}<button title="Editar" data-edit-product="${product.id}">Editar</button><button title="Ativar ou desativar" data-toggle-product="${product.id}">${product.status === "active" ? "Ocultar" : "Ativar"}</button><button title="Excluir" data-delete-product="${product.id}">Excluir</button></div></td></tr>`).join("");
   $("#adminEmpty").classList.toggle("hidden", products.length > 0);
 }
 
@@ -132,6 +163,69 @@ function openProductModal(product = null) {
   $("#productFormModal").classList.remove("hidden");
 }
 
+function renderPhotoManager() {
+  const grid = $("#photoManagerGrid");
+  const images = state.photoDraft;
+  grid.innerHTML = images.map((item, index) => `<article class="photo-manager-item ${item.url === state.photoPrimaryUrl ? "is-primary" : ""}"><div class="photo-manager-preview"><img src="${escapeHtml(item.url)}" alt="Pré-visualização ${index + 1}" /><span>${item.url === state.photoPrimaryUrl ? "Foto principal" : `Foto ${index + 1}`}</span></div><div class="photo-manager-item-actions"><button type="button" data-photo-primary="${index}" ${item.url === state.photoPrimaryUrl ? "disabled" : ""}>${item.url === state.photoPrimaryUrl ? "Principal" : "Definir principal"}</button><button type="button" data-photo-replace="${index}">Substituir</button><button type="button" class="photo-delete-button" data-photo-delete="${index}">Excluir</button></div></article>`).join("");
+  $("#photoManagerEmpty").classList.toggle("hidden", images.length > 0);
+}
+
+function openPhotoManager(product) {
+  if (!isAdmin() || !product) return;
+  state.photoProductId = product.id;
+  state.photoDraft = getProductImages(product);
+  state.photoPrimaryUrl = product.image || state.photoDraft[0]?.url || "";
+  state.photoReplaceIndex = null;
+  $("#photoManagerTitle").textContent = `Fotos — ${product.name}`;
+  $("#photoManagerProductLabel").textContent = `${product.code} · ${product.category} · somente ADM`;
+  $("#photoAddInput").value = "";
+  $("#photoAddInput").multiple = true;
+  renderPhotoManager();
+  $("#photoManagerModal").classList.remove("hidden");
+}
+
+async function addPhotoFiles(files) {
+  const selectedFiles = [...files].filter((file) => file.type.startsWith("image/"));
+  if (!selectedFiles.length) return;
+  const available = Math.max(0, 20 - state.photoDraft.length);
+  const newImages = await Promise.all(selectedFiles.slice(0, available).map(async (file) => ({ id: uid(), url: await readFileAsDataUrl(file) })));
+  state.photoDraft = [...state.photoDraft, ...newImages];
+  if (!state.photoPrimaryUrl && state.photoDraft[0]) state.photoPrimaryUrl = state.photoDraft[0].url;
+  renderPhotoManager();
+  if (selectedFiles.length > available) showToast("O limite é de 20 fotos por produto.");
+}
+
+async function replacePhotoFile(file) {
+  if (!file || state.photoReplaceIndex === null) return;
+  const index = state.photoReplaceIndex;
+  const oldUrl = state.photoDraft[index]?.url;
+  const url = await readFileAsDataUrl(file);
+  state.photoDraft[index] = { ...state.photoDraft[index], url };
+  if (state.photoPrimaryUrl === oldUrl) state.photoPrimaryUrl = url;
+  state.photoReplaceIndex = null;
+  renderPhotoManager();
+}
+
+async function saveManagedPhotos() {
+  if (!isAdmin() || !state.photoProductId) return;
+  const product = state.products.find((item) => item.id === state.photoProductId);
+  if (!product) return;
+  const images = state.photoDraft;
+  const primary = images.find((item) => item.url === state.photoPrimaryUrl)?.url || images[0]?.url || "";
+  try {
+    const result = await apiRequest(`/products?id=${encodeURIComponent(product.id)}`, { method: "PUT", body: JSON.stringify({ images, image: primary }) });
+    const savedProduct = result.product;
+    state.products = state.products.map((item) => item.id === savedProduct.id ? savedProduct : item);
+    saveProducts();
+    closeModals();
+    renderAdmin();
+    renderCatalog();
+    showToast("Fotos atualizadas no catálogo.");
+  } catch (error) {
+    showToast(error.message || "Não foi possível salvar as fotos.");
+  }
+}
+
 function closeModals() { $$(".modal-backdrop").forEach((modal) => modal.classList.add("hidden")); }
 
 function openProductDetail(product) {
@@ -141,7 +235,8 @@ function openProductDetail(product) {
   $("#modalCode").textContent = product.code;
   $("#modalDescription").textContent = product.description || "Uma peça escolhida para trazer presença e delicadeza à sua composição.";
   $("#modalPrice").textContent = formatPrice(product.price);
-  $("#modalImage").innerHTML = product.image ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" />` : "✦";
+  const images = getProductImages(product);
+  $("#modalImage").innerHTML = images.length ? `<div class="public-photo-gallery">${images.map((item, index) => `<img src="${escapeHtml(item.url)}" alt="${escapeHtml(product.name)} — foto ${index + 1}" />`).join("")}</div>` : "✦";
   const button = $("#modalSelectButton");
   button.innerHTML = state.selected.has(product.id) ? "Remover da seleção <span>×</span>" : "Selecionar peça <span>♡</span>";
   button.dataset.productId = product.id;
@@ -228,11 +323,15 @@ function buildIndividualPdf(product) {
 }
 
 document.addEventListener("click", async (event) => {
-  const target = event.target.closest("[data-view-product], [data-select-product], [data-catalog-category], [data-edit-product], [data-delete-product], [data-toggle-product], [data-print-product], [data-close-modal]");
+  const target = event.target.closest("[data-view-product], [data-select-product], [data-catalog-category], [data-edit-product], [data-delete-product], [data-toggle-product], [data-print-product], [data-manage-photos], [data-photo-primary], [data-photo-replace], [data-photo-delete], [data-close-modal]");
   if (!target) return;
   if (target.matches("[data-catalog-category]")) { state.catalogCategory = target.dataset.catalogCategory; renderCatalog(); return; }
   if (target.matches("[data-select-product]")) { const id = target.dataset.selectProduct; state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id); renderCatalog(); return; }
   if (target.matches("[data-view-product]")) { openProductDetail(state.products.find((product) => product.id === target.dataset.viewProduct)); return; }
+  if (target.matches("[data-manage-photos]")) { openPhotoManager(state.products.find((product) => product.id === target.dataset.managePhotos)); return; }
+  if (target.matches("[data-photo-primary]")) { state.photoPrimaryUrl = state.photoDraft[Number(target.dataset.photoPrimary)]?.url || state.photoPrimaryUrl; renderPhotoManager(); return; }
+  if (target.matches("[data-photo-replace]")) { state.photoReplaceIndex = Number(target.dataset.photoReplace); const input = $("#photoAddInput"); input.multiple = false; input.value = ""; input.click(); return; }
+  if (target.matches("[data-photo-delete]")) { const index = Number(target.dataset.photoDelete); const removed = state.photoDraft.splice(index, 1)[0]; if (removed?.url === state.photoPrimaryUrl) state.photoPrimaryUrl = state.photoDraft[0]?.url || ""; renderPhotoManager(); return; }
   if (target.matches("[data-edit-product]")) { openProductModal(state.products.find((product) => product.id === target.dataset.editProduct)); return; }
   if (target.matches("[data-print-product]")) { buildIndividualPdf(state.products.find((product) => product.id === target.dataset.printProduct)); return; }
   if (target.matches("[data-toggle-product]")) { const product = state.products.find((item) => item.id === target.dataset.toggleProduct); if (product) { const nextStatus = product.status === "active" ? "inactive" : "active"; const result = await tryApi(`/products?id=${encodeURIComponent(product.id)}`, { method: "PUT", body: JSON.stringify({ ...product, status: nextStatus }) }); product.status = result?.product?.status || nextStatus; saveProducts(); renderAdmin(); renderCatalog(); showToast(product.status === "active" ? "Produto ativado." : "Produto ocultado do catálogo."); } return; }
@@ -247,8 +346,10 @@ $("#adminSearch").addEventListener("input", renderAdmin);
 $("#adminCategoryFilter").addEventListener("change", (event) => { state.adminCategory = event.target.value; renderAdmin(); });
 $("#openProductButton").addEventListener("click", () => openProductModal());
 $("#openImportButton").addEventListener("click", () => { state.importRows = []; state.importedImages = {}; $("#csvInput").value = ""; $("#imageFolderInput").value = ""; renderImportPreview(); $("#importModal").classList.remove("hidden"); });
-$("#logoutButton").addEventListener("click", async () => { await tryApi("/auth?action=logout", { method: "POST" }); localStorage.removeItem(SESSION_KEY); renderAdmin(); showToast("Sessão encerrada."); });
-$("#loginForm").addEventListener("submit", async (event) => { event.preventDefault(); if ($("#loginPassword").value.length < 4) { showToast("A senha precisa ter pelo menos 4 caracteres."); return; } try { await apiRequest("/auth", { method: "POST", body: JSON.stringify({ email: $("#loginEmail").value.trim(), password: $("#loginPassword").value }) }); localStorage.setItem(SESSION_KEY, "true"); await refreshProductsFromApi(); renderAdmin(); showToast("Acesso liberado."); } catch (error) { showToast(error.message); } });
+$("#photoAddInput").addEventListener("change", async (event) => { const files = [...event.target.files]; if (state.photoReplaceIndex !== null) await replacePhotoFile(files[0]); else await addPhotoFiles(files); event.target.value = ""; event.target.multiple = true; });
+$("#savePhotosButton").addEventListener("click", saveManagedPhotos);
+$("#logoutButton").addEventListener("click", async () => { await tryApi("/auth?action=logout", { method: "POST" }); state.adminAuthenticated = false; localStorage.removeItem(SESSION_KEY); renderAdmin(); showToast("Sessão encerrada."); });
+$("#loginForm").addEventListener("submit", async (event) => { event.preventDefault(); if ($("#loginPassword").value.length < 4) { showToast("A senha precisa ter pelo menos 4 caracteres."); return; } try { await apiRequest("/auth", { method: "POST", body: JSON.stringify({ email: $("#loginEmail").value.trim(), password: $("#loginPassword").value }) }); state.adminAuthenticated = true; localStorage.setItem(SESSION_KEY, "true"); await refreshProductsFromApi(); renderAdmin(); showToast("Acesso liberado."); } catch (error) { state.adminAuthenticated = false; showToast(error.message); } });
 $("#productForm").addEventListener("submit", async (event) => { event.preventDefault(); const id = $("#productId").value || uid(); const existing = state.products.find((product) => product.id === id); const code = $("#productCode").value.trim(); if (state.products.some((product) => product.code.toLowerCase() === code.toLowerCase() && product.id !== id)) { showToast("Esse código já está cadastrado."); return; } let image = existing?.image || ""; const file = $("#productImage").files[0]; if (file) image = await readFileAsDataUrl(file); const product = { id, code, name: $("#productName").value.trim(), description: $("#productDescription").value.trim(), price: normalizePrice($("#productPrice").value), category: $("#productCategory").value, status: $("#productStatus").value, image, additionalImages: $("#productAdditionalImages").value.split("\n").map((item) => item.trim()).filter(Boolean) }; const result = await tryApi(existing ? `/products?id=${encodeURIComponent(id)}` : "/products", { method: existing ? "PUT" : "POST", body: JSON.stringify(product) }); const savedProduct = result?.product || product; if (existing) state.products = state.products.map((item) => item.id === id ? savedProduct : item); else state.products.push(savedProduct); saveProducts(); closeModals(); renderAdmin(); renderCatalog(); showToast(existing ? "Produto atualizado." : "Produto cadastrado."); });
 $("#csvInput").addEventListener("change", async (event) => { const file = event.target.files[0]; if (!file) return; const rows = parseCsv(await file.text()); const seenCodes = new Set(); state.importRows = rows.map((raw, index) => { const row = mapImportRow(raw, index); const normalizedCode = row.code.toLowerCase(); if (normalizedCode && seenCodes.has(normalizedCode)) { row.duplicate = true; row.valid = false; row.issue = "Código duplicado na planilha"; } if (normalizedCode) seenCodes.add(normalizedCode); return row; }); renderImportPreview(); });
 $("#imageFolderInput").addEventListener("change", async (event) => { const files = [...event.target.files]; state.importedImages = {}; await Promise.all(files.map(async (file) => { const name = file.name.replace(/\.[^.]+$/, "").toLowerCase(); state.importedImages[name] = await readFileAsDataUrl(file); })); showToast(`${files.length} foto(s) relacionada(s) à importação.`); });
@@ -258,4 +359,4 @@ $("#modalSelectButton").addEventListener("click", () => { const id = $("#modalSe
 $("#generatePdfButton").addEventListener("click", buildPrintCatalog);
 $("#generateCategoryPdfButton").addEventListener("click", buildCategoryPrintCatalogs);
 
-renderCategoryFilters(); routeFromHash(); refreshProductsFromApi();
+renderCategoryFilters(); routeFromHash(); refreshProductsFromApi(); restoreAdminSession();

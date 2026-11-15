@@ -55,6 +55,17 @@ No painel administrativo, a área **Gerar catálogos** oferece:
 
 Cada saída abre uma janela de impressão com o layout OSTENTY. Escolha **Salvar como PDF** no diálogo do navegador. Os dados são lidos do inventário atual no momento da geração.
 
+## Gestão de fotos
+
+Somente a sessão autenticada do ADM vê o botão **Fotos** na tabela de produtos. O gerenciador permite:
+
+- Adicionar uma ou várias imagens com pré-visualização antes de salvar.
+- Substituir qualquer imagem individual.
+- Excluir imagens.
+- Definir a foto principal, usada no card do catálogo e nos PDFs.
+
+As alterações são salvas no mesmo produto pela API protegida e aparecem automaticamente no catálogo público e nas próximas gerações de PDF. Visitantes públicos não recebem os controles administrativos.
+
 ## Desenvolvimento
 
 ```powershell

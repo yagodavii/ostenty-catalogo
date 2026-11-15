@@ -1,4 +1,19 @@
+const crypto = require("crypto");
+
 const CATEGORIES = ["Colares", "Brincos", "Argolas", "Anéis", "Conjuntos", "Pingentes", "Pulseiras"];
+
+function normalizeImages(product = {}) {
+  const source = Array.isArray(product.images) && product.images.length
+    ? product.images
+    : [product.image, ...(Array.isArray(product.additionalImages) ? product.additionalImages : [])];
+  const seen = new Set();
+  return source.map((item) => {
+    const url = typeof item === "string" ? item : item?.url;
+    if (!url || seen.has(url)) return null;
+    seen.add(url);
+    return { id: typeof item === "object" && item?.id ? String(item.id) : crypto.randomUUID(), url: String(url) };
+  }).filter(Boolean);
+}
 
 function setJsonHeaders(res) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -30,6 +45,8 @@ function normalizePrice(value) {
 }
 
 function serializeProduct(product) {
+  const images = normalizeImages(product);
+  const primary = images.find((item) => item.url === product.image)?.url || images[0]?.url || "";
   return {
     id: product.id,
     code: product.code,
@@ -38,11 +55,12 @@ function serializeProduct(product) {
     price: Number(product.price || 0),
     category: product.category,
     status: product.status === "inactive" ? "inactive" : "active",
-    image: product.image || "",
-    additionalImages: Array.isArray(product.additionalImages) ? product.additionalImages : [],
+    image: primary,
+    images,
+    additionalImages: images.filter((item) => item.url !== primary).map((item) => item.url),
     createdAt: product.createdAt || null,
     updatedAt: product.updatedAt || null,
   };
 }
 
-module.exports = { CATEGORIES, sendJson, sendError, readJson, normalizePrice, serializeProduct };
+module.exports = { CATEGORIES, sendJson, sendError, readJson, normalizePrice, normalizeImages, serializeProduct };

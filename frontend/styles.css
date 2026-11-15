@@ -175,6 +175,9 @@ td small { display: block; color: #a25f7e; font-size: 9px; font-weight: 400; mar
 .product-modal { width: min(780px, 100%); display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; }
 .modal-image { min-height: 410px; background: linear-gradient(145deg, #fceaf2, #e8d5c5); display: grid; place-items: center; color: var(--rose); font-size: 60px; }
 .modal-image img { width: 100%; height: 100%; object-fit: cover; }
+.public-photo-gallery { width: 100%; height: 100%; min-height: 410px; padding: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-content: center; }
+.public-photo-gallery img { min-height: 145px; max-height: 205px; border-radius: 12px; background: var(--white); object-fit: cover; }
+.public-photo-gallery img:first-child { grid-column: 1 / -1; max-height: 255px; }
 .modal-details { padding: 55px 43px; display: flex; flex-direction: column; justify-content: center; }
 .modal-details h2 { font-size: 43px; margin: 0 0 10px; }
 .product-code { color: #a25f7e; font-size: 10px; letter-spacing: .15em; text-transform: uppercase; }
@@ -202,6 +205,23 @@ label small { color: #a9959e; font-size: 9px; font-weight: 400; letter-spacing: 
 .import-preview th, .import-preview td { padding: 9px 12px; }
 .import-summary { padding: 12px; font-size: 11px; background: #fbf7f8; }
 .import-summary strong { color: #a25f7e; }
+.photo-manager-modal { width: min(820px, 100%); }
+.photo-manager-modal h2 { margin-bottom: 8px; }
+.photo-upload-actions { margin: 22px 0 18px; padding: 16px; border: 1px dashed var(--rose); border-radius: 14px; background: var(--pink-pale); display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.photo-upload-actions small { color: #a9959e; font-size: 10px; }
+.photo-upload-button { position: relative; cursor: pointer; }
+.photo-upload-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.photo-manager-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.photo-manager-item { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #fff; }
+.photo-manager-item.is-primary { border-color: var(--rose); box-shadow: 0 0 0 2px rgba(217,155,183,.18); }
+.photo-manager-preview { position: relative; aspect-ratio: 1 / 1; background: var(--pink-pale); }
+.photo-manager-preview img { width: 100%; height: 100%; object-fit: cover; }
+.photo-manager-preview span { position: absolute; left: 8px; bottom: 8px; padding: 5px 7px; border-radius: 999px; color: var(--white); background: rgba(8,5,8,.68); font-size: 9px; }
+.photo-manager-item-actions { display: flex; flex-wrap: wrap; gap: 5px; padding: 9px; }
+.photo-manager-item-actions button { flex: 1 1 auto; min-height: 28px; padding: 5px 7px; border-radius: 7px; background: #fbf7f8; color: #a25f7e; font-size: 10px; }
+.photo-manager-item-actions button:disabled { background: var(--rose); color: var(--white); }
+.photo-manager-item-actions .photo-delete-button { color: #9a5d62; }
+.photo-manager-empty { padding: 35px 20px; border: 1px dashed var(--line); border-radius: 12px; color: #a9959e; text-align: center; font-size: 12px; }
 .toast { position: fixed; z-index: 70; left: 50%; bottom: 24px; transform: translate(-50%, 90px); opacity: 0; background: var(--ink); color: var(--white); border-radius: 999px; padding: 13px 19px; font-size: 12px; box-shadow: var(--shadow); transition: transform .3s, opacity .3s; pointer-events: none; }
 .toast.show { transform: translate(-50%, 0); opacity: 1; }
 .print-catalog { display: none; }
@@ -281,9 +301,12 @@ label small { color: #a9959e; font-size: 9px; font-weight: 400; letter-spacing: 
   .table-tools select { height: 38px; padding: 0 12px; }
   .product-modal { grid-template-columns: 1fr; }
   .modal-image { min-height: 260px; }
+  .public-photo-gallery { min-height: 260px; }
   .modal-details { padding: 32px 26px; }
   .modal-details h2 { font-size: 36px; }
   .form-modal { padding: 34px 23px 25px; }
+  .photo-manager-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .photo-upload-actions { align-items: start; flex-direction: column; }
   .form-grid { grid-template-columns: 1fr; }
   .full-span { grid-column: auto; }
   .form-actions { flex-direction: column-reverse; }

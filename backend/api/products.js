@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const { getProductsCollection } = require("../lib/mongodb");
-const { CATEGORIES, normalizePrice, readJson, sendJson, sendError, serializeProduct } = require("../lib/config");
+const { CATEGORIES, normalizeImages, normalizePrice, readJson, sendJson, sendError, serializeProduct } = require("../lib/config");
 const { requireAuth } = require("../lib/auth");
 
 function productPayload(body, existing = {}) {
@@ -9,7 +9,11 @@ function productPayload(body, existing = {}) {
   const code = String(body.code ?? existing.code ?? "").trim();
   const name = String(body.name ?? existing.name ?? "").trim();
   if (!code || !name) throw new Error("Código e nome são obrigatórios.");
-  return { id: existing.id || crypto.randomUUID(), code, name, description: String(body.description ?? existing.description ?? "").trim(), price: normalizePrice(body.price ?? existing.price), category, status: body.status === "inactive" ? "inactive" : "active", image: String(body.image ?? existing.image ?? ""), additionalImages: Array.isArray(body.additionalImages) ? body.additionalImages.filter(Boolean).slice(0, 20) : (existing.additionalImages || []), updatedAt: new Date(), createdAt: existing.createdAt || new Date() };
+  const requestedImages = Array.isArray(body.images) ? body.images : null;
+  const images = (requestedImages ? normalizeImages({ images: requestedImages }) : normalizeImages({ image: body.image ?? existing.image, additionalImages: body.additionalImages ?? existing.additionalImages })).slice(0, 20);
+  const requestedPrimary = body.image !== undefined ? String(body.image || "") : String(existing.image || "");
+  const primary = images.find((item) => item.url === requestedPrimary)?.url || images[0]?.url || "";
+  return { id: existing.id || crypto.randomUUID(), code, name, description: String(body.description ?? existing.description ?? "").trim(), price: normalizePrice(body.price ?? existing.price), category, status: body.status === "inactive" ? "inactive" : "active", image: primary, images, additionalImages: images.filter((item) => item.url !== primary).map((item) => item.url), updatedAt: new Date(), createdAt: existing.createdAt || new Date() };
 }
 
 module.exports = async function productsHandler(req, res) {
