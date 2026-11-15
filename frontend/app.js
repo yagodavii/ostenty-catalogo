@@ -1,7 +1,7 @@
 const CATEGORIES = ["Colares", "Brincos", "Argolas", "Anéis", "Conjuntos", "Pingentes", "Pulseiras"];
 const STORAGE_KEY = "ostenty_catalog_products_v1";
 const SEED_VERSION_KEY = "ostenty_catalog_seed_version";
-const SEED_VERSION = "photos-2026-11-v1";
+const SEED_VERSION = "photos-2026-11-v2";
 
 const state = {
   products: loadProducts(),
@@ -26,6 +26,13 @@ function loadProducts() {
   try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { saved = []; }
   const seed = window.OSTENTY_SEED_PRODUCTS || [];
   if (localStorage.getItem(SEED_VERSION_KEY) !== SEED_VERSION) {
+    const seedById = new Map(seed.map((product) => [product.id, product]));
+    const renames = window.OSTENTY_SEED_RENAMES || {};
+    saved = saved.map((product) => {
+      const newId = renames[product.id];
+      const replacement = seedById.get(newId);
+      return replacement ? { ...product, ...replacement, description: product.description, price: product.price, status: product.status } : product;
+    });
     const knownIds = new Set(saved.map((product) => product.id));
     saved = [...saved, ...seed.filter((product) => !knownIds.has(product.id))];
     try {
