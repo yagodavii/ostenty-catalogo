@@ -70,8 +70,6 @@ O site inclui manifesto e service worker para instalação como PWA. Fotos já a
 
 ```text
 ostenty-catalogo/
-├── api/                         # Handlers de API legados
-├── backend/                     # Handlers de API legados
 ├── frontend/
 │   ├── assets/products/         # Fotos organizadas por categoria e acabamento
 │   ├── icons/                   # Ícones do PWA
