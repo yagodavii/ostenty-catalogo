@@ -70,7 +70,7 @@ O site inclui manifesto e service worker para instalação como PWA. Fotos já a
 
 ```text
 ostenty-catalogo/
-├── api/                         # Handlers legados preparados para Vercel
+├── api/                         # Handlers de API legados
 ├── backend/                     # Handlers de API legados
 ├── frontend/
 │   ├── assets/products/         # Fotos organizadas por categoria e acabamento
@@ -84,7 +84,6 @@ ostenty-catalogo/
 ├── functions/                   # Cloudflare Pages Functions de autenticação
 ├── migrations/                  # Migrações SQL do banco D1
 ├── index.html                   # Entrada publicada na raiz
-├── netlify.toml                 # Configuração de publicação no Netlify
 ├── service-worker.js            # Cache do PWA
 └── README.md
 ```
@@ -98,7 +97,7 @@ ostenty-catalogo/
 - Cloudflare Access para confirmação de e-mails administrativos
 - jsPDF para geração de catálogos em PDF
 - PWA, manifesto e service worker para instalação e cache
-- Netlify e Cloudflare Pages como opções de hospedagem
+- Cloudflare Pages para hospedagem
 
 ## ▶️ Como executar
 
