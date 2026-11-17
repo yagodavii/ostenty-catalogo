@@ -347,6 +347,8 @@ function openProductDetail(product) {
   $("#modalCode").textContent = product.code;
   $("#modalDescription").textContent = product.description || "Uma peça escolhida para trazer presença e delicadeza à sua composição.";
   $("#modalPrice").textContent = formatPrice(product.price);
+  const whatsappMessage = `Olá! Tenho interesse neste produto do catálogo:\n${product.name} (código ${product.code}). Poderia me passar mais informações?`;
+  $("#whatsappProductLink").href = `https://wa.me/554396263016?text=${encodeURIComponent(whatsappMessage)}`;
   const images = getProductImages(product);
   $("#modalImage").innerHTML = images.length ? `<div class="public-photo-gallery">${images.map((item, index) => `<img src="${escapeHtml(item.url)}" alt="${escapeHtml(product.name)} — foto ${index + 1}" />`).join("")}</div>` : "✦";
   $("#productModal").classList.remove("hidden");
