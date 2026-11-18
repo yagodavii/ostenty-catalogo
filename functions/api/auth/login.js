@@ -8,8 +8,8 @@ export async function onRequestPost({ request, env }) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "E-mail ou senha incorretos." }, 401);
   if (typeof password !== "string" || password.length > 256) return json({ error: "E-mail ou senha incorretos." }, 401);
   const user = await env.DB.prepare("SELECT name, password_hash, password_salt, is_admin FROM admin_users WHERE email = ?").bind(email).first();
-  if (!user || !(await verifyPassword(password, user.password_salt, user.password_hash))) {
-    return json({ error: "E-mail ou senha incorretos. Se ainda não criou seu acesso, use ‘Criar acesso’." }, 401);
+  if (!user || !user.is_admin || !ADMIN_EMAILS.has(email) || !(await verifyPassword(password, user.password_salt, user.password_hash))) {
+    return json({ error: "E-mail ou senha incorretos. O acesso é restrito a administradores autorizados." }, 401);
   }
   const cookie = await createSession(email, env);
   const isAdmin = Boolean(user.is_admin) && ADMIN_EMAILS.has(email);

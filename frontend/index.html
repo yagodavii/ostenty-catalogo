@@ -92,27 +92,13 @@
             <div class="login-form-wrap">
               <div id="authLoginView">
                 <p class="eyebrow"><span></span> Acesso OSTENTY</p><h2 id="adminTitle">Entre no<br /><em>sistema.</em></h2>
-                <p class="muted">Entre na sua conta ou crie um acesso para continuar.</p>
+                <p class="muted">Acesso restrito a administradores autorizados.</p>
                 <form id="adminLoginForm">
                   <label>E-mail<input id="loginEmail" type="email" autocomplete="username" required /></label>
                   <label>Senha<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
                   <button class="button button-dark full-width" type="submit">Entrar no sistema <span>→</span></button>
                 </form>
-                <button class="auth-switch" type="button" data-auth-view="register">Primeiro acesso? Criar conta</button>
                 <p id="authLoginMessage" class="login-hint" role="status"></p>
-              </div>
-              <div id="authRegisterView" class="hidden">
-                <p class="eyebrow"><span></span> Criar conta</p><h2>Seu acesso<br /><em>OSTENTY.</em></h2>
-                <p class="muted">Crie sua conta com seu nome, e-mail e uma senha pessoal.</p>
-                <form id="adminRegisterForm">
-                  <label>Nome que aparecerá no painel<input id="registerName" type="text" autocomplete="name" minlength="2" maxlength="80" required /></label>
-                  <label>E-mail<input id="registerEmail" type="email" autocomplete="username" required /></label>
-                  <label>Crie uma senha<input id="registerPassword" type="password" autocomplete="new-password" minlength="10" required /></label>
-                  <label>Confirme a senha<input id="registerPasswordConfirm" type="password" autocomplete="new-password" minlength="10" required /></label>
-                  <button class="button button-dark full-width" type="submit">Criar conta <span>→</span></button>
-                </form>
-                <button class="auth-switch" type="button" data-auth-view="login">Já tem conta? Entrar</button>
-                <p id="authRegisterMessage" class="login-hint" role="status"></p>
               </div>
               <div id="authUnavailableView" class="hidden">
                 <p class="eyebrow"><span></span> Configuração necessária</p><h2>Acesso ao<br /><em>painel.</em></h2>
@@ -141,6 +127,6 @@
     </div>
     <script src="/frontend/vendor/jspdf.umd.min.js"></script>
     <script src="/frontend/products-seed.js"></script>
-    <script src="/frontend/app.js?v=auth-access-v2"></script>
+    <script src="/frontend/app.js?v=public-catalog-admin-login-v1"></script>
   </body>
 </html>
