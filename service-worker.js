@@ -1,4 +1,4 @@
-const CACHE_NAME = "ostenty-app-v7";
+const CACHE_NAME = "ostenty-app-v8";
 const SHELL = [
   "/frontend/index.html",
   "/frontend/styles.css",
@@ -8,7 +8,7 @@ const SHELL = [
   "/frontend/manifest.webmanifest",
   "/frontend/icons/icon-192.png",
   "/frontend/icons/icon-512.png",
-  "/frontend/icons/icon.svg"
+  "/frontend/icons/icon-180.png"
 ];
 const IMAGE_CACHE = "ostenty-images-v1";
 const MAX_CACHED_IMAGES = 120;
