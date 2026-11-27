@@ -33,6 +33,8 @@ body.admin-authenticated #adminPanel { display: block !important; }
 .cart-button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); color: var(--ink); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
 .cart-button span { font-size: 14px; }
 .cart-button strong { min-width: 19px; height: 19px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--pink); font-size: 10px; }
+.nav-logout-button { display: inline-flex; align-items: center; justify-content: center; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+.nav-logout-button:hover { background: var(--ink); color: var(--white); }
 .icon-button { background: transparent; width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 50%; font-size: 18px; }
 .mobile-menu-button { display: none; }
 .install-app-button { height: 38px; min-height: 38px; margin-left: 16px; padding: 0 13px; white-space: nowrap; font-size: 10px; }

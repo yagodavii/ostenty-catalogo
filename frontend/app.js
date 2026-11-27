@@ -1,4 +1,8 @@
-const CATEGORIES = ["Colares", "Brincos", "Argolas", "Anéis", "Conjuntos", "Pingentes", "Pulseiras", "Bracelete", "Três cores"];
+const CATEGORIES = ["Colares", "Brincos", "Argolas", "Anéis", "Conjuntos", "Pingentes", "Pulseiras", "Braceletes", "Três cores"];
+const BRACELETE_CODES = new Set([
+  "BRA-0089-D", "BRA-0131-D", "BRA-0132-D", "BRA-0133-D", "BRA-0134-D", "BRA-0459-D",
+  "BRA-0089-P", "BRA-0131-P", "BRA-0132-P", "BRA-0133-P", "BRA-0134-P", "BRA-0459-P",
+]);
 const STORAGE_KEY = "ostenty_catalog_products_v1";
 const SEED_VERSION_KEY = "ostenty_catalog_seed_version";
 const CART_STORAGE_KEY = "ostenty_catalog_cart_v1";
@@ -34,7 +38,7 @@ function normalizeCatalogCategory(category) {
 }
 
 function categoryMatches(product, category) {
-  if (category === "Bracelete") return product.category === "Pulseiras" || product.category === "Bracelete";
+  if (category === "Bracelete" || category === "Braceletes") return BRACELETE_CODES.has(product.code);
   return product.category === category;
 }
 
@@ -204,11 +208,12 @@ function renderAuthView(view, message = "") {
   $("#adminView").classList.remove("hidden");
   $("#adminAuthPanel").classList.remove("hidden");
   $("#adminPanel").classList.add("hidden");
+  updateNavigation();
 }
 
 function updateNavigation() {
   $(".main-nav").classList.remove("hidden");
-  $("#appLogoutButton").classList.toggle("hidden", !isAdmin());
+  $("#appLogoutButton").classList.toggle("hidden", !state.adminAuthenticated);
   $$('[data-admin-only]').forEach((element) => element.classList.toggle("hidden", !isAdmin()));
   updateCartSummary();
 }
