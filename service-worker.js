@@ -1,4 +1,4 @@
-const CACHE_NAME = "ostenty-app-v8";
+const CACHE_NAME = "ostenty-app-v9";
 const SHELL = [
   "/frontend/index.html",
   "/frontend/styles.css",
@@ -51,6 +51,6 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (SHELL.includes(url.pathname)) {
-    event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
+    event.respondWith(caches.match(url.pathname).then((cached) => cached || fetch(request)));
   }
 });

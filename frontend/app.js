@@ -1,6 +1,7 @@
 const CATEGORIES = ["Colares", "Brincos", "Argolas", "Anéis", "Conjuntos", "Pingentes", "Pulseiras"];
 const STORAGE_KEY = "ostenty_catalog_products_v1";
 const SEED_VERSION_KEY = "ostenty_catalog_seed_version";
+const CART_STORAGE_KEY = "ostenty_catalog_cart_v1";
 const SEED_VERSION = "photos-2026-11-v3";
 
 const state = {
@@ -12,6 +13,8 @@ const state = {
   activeProductId: null,
   importRows: [],
   importedImages: {},
+  cart: loadCart(),
+  productQuantities: {},
   photoProductId: null,
   photoDraft: [],
   photoPrimaryUrl: "",
@@ -50,6 +53,109 @@ function loadProducts() {
 
 function saveProducts() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.products));
+}
+
+function loadCart() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
+    return Array.isArray(saved)
+      ? saved.filter((item) => item && typeof item.productId === "string" && Number(item.quantity) > 0).map((item) => ({
+        productId: item.productId,
+        quantity: Math.max(1, Math.min(99, Number(item.quantity) || 1)),
+        note: typeof item.note === "string" ? item.note : "",
+      }))
+      : [];
+  } catch { return []; }
+}
+
+function saveCart() {
+  try { localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(state.cart)); } catch { showToast("Não foi possível salvar o carrinho neste navegador."); }
+  updateCartSummary();
+}
+
+function cartQuantity() {
+  return state.cart.reduce((total, item) => total + item.quantity, 0);
+}
+
+function updateCartSummary() {
+  const count = $("#cartCount");
+  if (count) count.textContent = cartQuantity();
+  const button = $("#cartButton");
+  if (button) button.setAttribute("aria-label", `Abrir carrinho com ${cartQuantity()} ${cartQuantity() === 1 ? "item" : "itens"}`);
+}
+
+function getProductQuantity(productId) {
+  return Math.max(1, Math.min(99, Number(state.productQuantities[productId]) || 1));
+}
+
+function setProductQuantity(productId, quantity) {
+  state.productQuantities[productId] = Math.max(1, Math.min(99, Number(quantity) || 1));
+}
+
+function getCartItem(productId) {
+  return state.cart.find((item) => item.productId === productId);
+}
+
+function numericPrice(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function addToCart(productId, quantity = getProductQuantity(productId), note = "") {
+  const product = state.products.find((item) => item.id === productId && item.status === "active");
+  if (!product) return;
+  const amount = Math.max(1, Math.min(99, Number(quantity) || 1));
+  const existing = getCartItem(productId);
+  if (existing) {
+    existing.quantity = Math.min(99, existing.quantity + amount);
+    if (String(note).trim()) existing.note = String(note).trim();
+  } else {
+    state.cart.push({ productId, quantity: amount, note: String(note).trim() });
+  }
+  saveCart();
+  showToast(`${amount} ${amount === 1 ? "unidade adicionada" : "unidades adicionadas"} ao carrinho.`);
+  renderCatalog();
+}
+
+function removeFromCart(productId) {
+  state.cart = state.cart.filter((item) => item.productId !== productId);
+  saveCart();
+  renderCart();
+}
+
+function changeCartQuantity(productId, delta) {
+  const item = getCartItem(productId);
+  if (!item) return;
+  item.quantity = Math.max(0, Math.min(99, item.quantity + delta));
+  if (!item.quantity) {
+    removeFromCart(productId);
+    showToast("Produto removido do carrinho.");
+    return;
+  }
+  saveCart();
+  renderCart();
+}
+
+function cartTotal() {
+  return state.cart.reduce((total, item) => {
+    const product = state.products.find((candidate) => candidate.id === item.productId);
+    const price = numericPrice(product?.price);
+    return total + (price === null ? 0 : price * item.quantity);
+  }, 0);
+}
+
+function cartTotalLabel() {
+  const hasUnknownPrice = state.cart.some((item) => {
+    const product = state.products.find((candidate) => candidate.id === item.productId);
+    return numericPrice(product?.price) === null;
+  });
+  return hasUnknownPrice ? "Preço sob consulta" : formatPrice(cartTotal());
+}
+
+function cartItemSubtotalLabel(product, quantity) {
+  const price = numericPrice(product.price);
+  return price === null ? "Preço sob consulta" : formatPrice(price * quantity);
 }
 
 function uid() { return `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`; }
@@ -93,6 +199,7 @@ function updateNavigation() {
   $(".main-nav").classList.remove("hidden");
   $("#appLogoutButton").classList.toggle("hidden", !isAdmin());
   $$('[data-admin-only]').forEach((element) => element.classList.toggle("hidden", !isAdmin()));
+  updateCartSummary();
 }
 
 function beginAdminEmailVerification() {
@@ -233,9 +340,61 @@ function renderCatalog() {
   renderCategoryFilters();
   const products = filteredProducts();
   $("#catalogCount").textContent = `${products.length} ${products.length === 1 ? "peça" : "peças"}`;
-  $("#catalogGrid").innerHTML = products.map((product) => `<article class="product-card"><div class="product-photo">${productImage(product)}<span class="category-stamp">${escapeHtml(product.category)}</span></div><div class="product-meta"><small>${escapeHtml(product.code)}</small><h3 title="${escapeHtml(product.name)}">${escapeHtml(product.name)}</h3><div class="product-meta-bottom"><strong class="product-price">${formatPrice(product.price)}</strong><button class="view-product" data-view-product="${product.id}">Ver detalhes →</button></div></div></article>`).join("");
+  $("#catalogGrid").innerHTML = products.map((product) => {
+    const quantity = getProductQuantity(product.id);
+    return `<article class="product-card"><div class="product-photo">${productImage(product)}<span class="category-stamp">${escapeHtml(product.category)}</span></div><div class="product-meta"><small>${escapeHtml(product.code)}</small><h3 title="${escapeHtml(product.name)}">${escapeHtml(product.name)}</h3><div class="product-meta-bottom"><strong class="product-price">${formatPrice(product.price)}</strong><button class="view-product" data-view-product="${product.id}">Ver detalhes →</button></div><div class="product-cart-row"><div class="quantity-control compact" aria-label="Quantidade de ${escapeHtml(product.name)}"><button type="button" data-product-quantity-decrease="${product.id}" aria-label="Diminuir quantidade">−</button><strong>${quantity}</strong><button type="button" data-product-quantity-increase="${product.id}" aria-label="Aumentar quantidade">+</button></div><button class="button button-dark add-to-cart-button" type="button" data-add-to-cart="${product.id}">Adicionar</button></div></div></article>`;
+  }).join("");
   $("#catalogEmpty").classList.toggle("hidden", products.length > 0);
   $("#catalogGrid").classList.toggle("hidden", products.length === 0);
+  updateCartSummary();
+}
+
+function renderCart() {
+  const list = $("#cartItems");
+  const empty = $("#cartEmpty");
+  const content = $("#cartContent");
+  const validItems = state.cart.filter((item) => state.products.some((product) => product.id === item.productId && product.status === "active"));
+  if (validItems.length !== state.cart.length) {
+    state.cart = validItems;
+    saveCart();
+  }
+  empty.classList.toggle("hidden", !validItems.length);
+  content.classList.toggle("hidden", !validItems.length);
+  if (!validItems.length) {
+    list.innerHTML = "";
+    $("#cartTotal").textContent = formatPrice(0);
+    return;
+  }
+  list.innerHTML = validItems.map((item) => {
+    const product = state.products.find((candidate) => candidate.id === item.productId);
+    return `<article class="cart-item"><div class="cart-item-image">${productImage(product)}</div><div class="cart-item-main"><div class="cart-item-heading"><div><small>${escapeHtml(product.code)}</small><h3>${escapeHtml(product.name)}</h3></div><button class="cart-remove" type="button" data-cart-remove="${product.id}" aria-label="Remover ${escapeHtml(product.name)}">×</button></div><div class="cart-item-price"><span>Valor unitário</span><strong>${formatPrice(product.price)}</strong></div><div class="cart-item-actions"><div class="quantity-control"><button type="button" data-cart-decrease="${product.id}" aria-label="Diminuir quantidade">−</button><strong>${item.quantity}</strong><button type="button" data-cart-increase="${product.id}" aria-label="Aumentar quantidade">+</button></div><strong class="cart-item-subtotal">${cartItemSubtotalLabel(product, item.quantity)}</strong></div><label class="cart-note-label">OBSERVAÇÃO DO CLIENTE<textarea rows="2" data-cart-note="${product.id}" placeholder="Ex.: Quero 1 tamanho 14 e 1 tamanho 16.">${escapeHtml(item.note)}</textarea><small>Tamanhos: 14 ao 26. Consulte a disponibilidade.</small></label></div></article>`;
+  }).join("");
+  $("#cartTotal").textContent = cartTotalLabel();
+}
+
+function openCart() {
+  renderCart();
+  $("#cartModal").classList.remove("hidden");
+}
+
+function finalizeOrderOnWhatsApp() {
+  if (!state.cart.length) { showToast("Adicione pelo menos um produto ao carrinho."); return; }
+  const items = state.cart.map((item) => ({ item, product: state.products.find((product) => product.id === item.productId) })).filter(({ product }) => product?.status === "active");
+  if (!items.length) { state.cart = []; saveCart(); showToast("Os produtos do carrinho não estão mais disponíveis."); return; }
+  const missingNotes = items.filter(({ item }) => item.quantity > 1 && !item.note.trim());
+  if (missingNotes.length && !window.confirm("Há produtos com mais de uma unidade sem observação de tamanho. Deseja continuar mesmo assim?")) return;
+  const lines = ["NOVO PEDIDO - OSTENTY", ""];
+  items.forEach(({ item, product }) => {
+    lines.push(`Produto: ${product.name}`);
+    lines.push(`Código: ${product.code}`);
+    lines.push(`Valor unitário: ${formatPrice(product.price)}`);
+    lines.push(`Quantidade: ${item.quantity} ${item.quantity === 1 ? "unidade" : "unidades"}`);
+    lines.push(`Observação: ${item.note.trim() || "Sem observação."}`);
+    lines.push("");
+  });
+  lines.push(`Total do pedido: ${cartTotalLabel()}`);
+  const url = `https://wa.me/554396263016?text=${encodeURIComponent(lines.join("\n"))}`;
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 function renderAdmin() {
@@ -337,8 +496,11 @@ function openProductDetail(product) {
   $("#modalCode").textContent = product.code;
   $("#modalDescription").textContent = product.description || "Uma peça escolhida para trazer presença e delicadeza à sua composição.";
   $("#modalPrice").textContent = formatPrice(product.price);
-  const whatsappMessage = `Olá! Tenho interesse neste produto do catálogo:\n${product.name} (código ${product.code}). Poderia me passar mais informações?`;
-  $("#whatsappProductLink").href = `https://wa.me/554396263016?text=${encodeURIComponent(whatsappMessage)}`;
+  $("#modalQuantity").textContent = getProductQuantity(product.id);
+  $("#modalObservation").value = getCartItem(product.id)?.note || "";
+  $("#modalAddToCart").dataset.productId = product.id;
+  $("#modalQuantityDecrease").dataset.productId = product.id;
+  $("#modalQuantityIncrease").dataset.productId = product.id;
   const images = getProductImages(product);
   $("#modalImage").innerHTML = images.length ? `<div class="public-photo-gallery">${images.map((item, index) => `<img src="${escapeHtml(item.url)}" alt="${escapeHtml(product.name)} — foto ${index + 1}" />`).join("")}</div>` : "✦";
   $("#productModal").classList.remove("hidden");
@@ -628,9 +790,32 @@ function buildIndividualPdf(product) {
 }
 
 document.addEventListener("click", async (event) => {
-  const target = event.target.closest("[data-view-product], [data-catalog-category], [data-edit-product], [data-delete-product], [data-toggle-product], [data-print-product], [data-manage-photos], [data-photo-primary], [data-photo-replace], [data-photo-delete], [data-close-modal]");
+  const target = event.target.closest("[data-view-product], [data-catalog-category], [data-edit-product], [data-delete-product], [data-toggle-product], [data-print-product], [data-manage-photos], [data-photo-primary], [data-photo-replace], [data-photo-delete], [data-product-quantity-decrease], [data-product-quantity-increase], [data-add-to-cart], [data-modal-quantity-decrease], [data-modal-quantity-increase], [data-modal-add-to-cart], [data-cart-decrease], [data-cart-increase], [data-cart-remove], [data-close-modal]");
   if (!target) return;
   if (target.matches("[data-catalog-category]")) { state.catalogCategory = target.dataset.catalogCategory; renderCatalog(); return; }
+  if (target.matches("[data-product-quantity-decrease], [data-product-quantity-increase]")) {
+    const productId = target.dataset.productQuantityDecrease || target.dataset.productQuantityIncrease;
+    setProductQuantity(productId, getProductQuantity(productId) + (target.dataset.productQuantityIncrease ? 1 : -1));
+    renderCatalog();
+    return;
+  }
+  if (target.matches("[data-add-to-cart]")) { addToCart(target.dataset.addToCart); return; }
+  if (target.matches("[data-modal-quantity-decrease], [data-modal-quantity-increase]")) {
+    const productId = target.dataset.productId;
+    setProductQuantity(productId, getProductQuantity(productId) + (target.matches("[data-modal-quantity-increase]") ? 1 : -1));
+    $("#modalQuantity").textContent = getProductQuantity(productId);
+    return;
+  }
+  if (target.matches("[data-modal-add-to-cart]")) {
+    addToCart(target.dataset.productId, getProductQuantity(target.dataset.productId), $("#modalObservation").value);
+    closeModals();
+    return;
+  }
+  if (target.matches("[data-cart-decrease], [data-cart-increase]")) {
+    changeCartQuantity(target.dataset.cartDecrease || target.dataset.cartIncrease, target.dataset.cartIncrease ? 1 : -1);
+    return;
+  }
+  if (target.matches("[data-cart-remove]")) { removeFromCart(target.dataset.cartRemove); return; }
   if (target.matches("[data-view-product]")) { openProductDetail(state.products.find((product) => product.id === target.dataset.viewProduct)); return; }
   if (target.matches("[data-manage-photos]")) { openPhotoManager(state.products.find((product) => product.id === target.dataset.managePhotos)); return; }
   if (target.matches("[data-photo-primary]")) { state.photoPrimaryUrl = state.photoDraft[Number(target.dataset.photoPrimary)]?.url || state.photoPrimaryUrl; renderPhotoManager(); return; }
@@ -641,6 +826,15 @@ document.addEventListener("click", async (event) => {
   if (target.matches("[data-toggle-product]")) { const product = state.products.find((item) => item.id === target.dataset.toggleProduct); if (product) { const nextStatus = product.status === "active" ? "inactive" : "active"; product.status = nextStatus; saveProducts(); renderAdmin(); renderCatalog(); showToast(product.status === "active" ? "Produto ativado." : "Produto ocultado do catálogo."); } return; }
   if (target.matches("[data-delete-product]")) { const product = state.products.find((item) => item.id === target.dataset.deleteProduct); if (product && window.confirm(`Excluir “${product.name}”?`)) { state.products = state.products.filter((item) => item.id !== product.id); saveProducts(); renderAdmin(); renderCatalog(); showToast("Produto excluído."); } return; }
   if (target.matches("[data-close-modal]")) closeModals();
+});
+
+document.addEventListener("input", (event) => {
+  const target = event.target.closest("[data-cart-note]");
+  if (!target) return;
+  const item = getCartItem(target.dataset.cartNote);
+  if (!item) return;
+  item.note = target.value;
+  saveCart();
 });
 
 document.addEventListener("click", async (event) => {
@@ -669,6 +863,8 @@ $("#adminLoginForm").addEventListener("submit", async (event) => {
 
 window.addEventListener("hashchange", routeFromHash);
 $("#mobileMenuButton").addEventListener("click", () => $(".main-nav").classList.toggle("open"));
+$("#cartButton").addEventListener("click", openCart);
+$("#finalizeOrderButton").addEventListener("click", finalizeOrderOnWhatsApp);
 $("#catalogSearchButton").addEventListener("click", () => { state.catalogSearchQuery = $("#catalogSearch").value; renderCatalog(); });
 $("#adminSearchButton").addEventListener("click", () => { state.adminSearchQuery = $("#adminSearch").value; renderAdmin(); });
 $("#adminSearch").addEventListener("keydown", (event) => { if (event.key === "Enter") event.preventDefault(); });
