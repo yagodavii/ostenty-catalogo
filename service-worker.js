@@ -1,9 +1,10 @@
-const CACHE_NAME = "ostenty-app-v9";
+const CACHE_NAME = "ostenty-app-v10";
 const SHELL = [
   "/frontend/index.html",
   "/frontend/styles.css",
   "/frontend/app.js",
   "/frontend/products-seed.js",
+  "/frontend/photo-products-seed.js",
   "/frontend/vendor/jspdf.umd.min.js",
   "/frontend/manifest.webmanifest",
   "/frontend/icons/icon-192.png",

@@ -1,8 +1,8 @@
-const CATEGORIES = ["Colares", "Brincos", "Argolas", "Anéis", "Conjuntos", "Pingentes", "Pulseiras"];
+const CATEGORIES = ["Colares", "Brincos", "Argolas", "Anéis", "Conjuntos", "Pingentes", "Pulseiras", "Três cores"];
 const STORAGE_KEY = "ostenty_catalog_products_v1";
 const SEED_VERSION_KEY = "ostenty_catalog_seed_version";
 const CART_STORAGE_KEY = "ostenty_catalog_cart_v1";
-const SEED_VERSION = "photos-2026-11-v3";
+const SEED_VERSION = "photos-2026-11-v4";
 
 const state = {
   products: loadProducts(),
@@ -32,7 +32,7 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 function loadProducts() {
   let saved = [];
   try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { saved = []; }
-  const seed = window.OSTENTY_SEED_PRODUCTS || [];
+  const seed = [...(window.OSTENTY_SEED_PRODUCTS || []), ...(window.OSTENTY_PHOTO_PRODUCTS || [])];
   if (localStorage.getItem(SEED_VERSION_KEY) !== SEED_VERSION) {
     const seedById = new Map(seed.map((product) => [product.id, product]));
     const renames = window.OSTENTY_SEED_RENAMES || {};
