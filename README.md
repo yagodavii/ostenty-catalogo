@@ -45,6 +45,7 @@ A área pública apresenta as peças com imagem, nome, código, categoria, acaba
 - Conjuntos
 - Pingentes
 - Pulseiras
+- Bracelete
 
 ### 2. 🔐 Contas e acesso administrativo
 

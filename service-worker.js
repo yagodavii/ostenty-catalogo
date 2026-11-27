@@ -1,4 +1,4 @@
-const CACHE_NAME = "ostenty-app-v10";
+const CACHE_NAME = "ostenty-app-v12";
 const SHELL = [
   "/frontend/index.html",
   "/frontend/styles.css",
