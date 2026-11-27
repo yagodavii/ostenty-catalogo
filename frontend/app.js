@@ -1,8 +1,8 @@
-const CATEGORIES = ["Colares", "Brincos", "Argolas", "Anéis", "Conjuntos", "Pingentes", "Pulseiras", "Três cores"];
+const CATEGORIES = ["Colares", "Brincos", "Argolas", "Anéis", "Conjuntos", "Pingentes", "Pulseiras", "Bracelete", "Três cores"];
 const STORAGE_KEY = "ostenty_catalog_products_v1";
 const SEED_VERSION_KEY = "ostenty_catalog_seed_version";
 const CART_STORAGE_KEY = "ostenty_catalog_cart_v1";
-const SEED_VERSION = "photos-2026-11-v4";
+const SEED_VERSION = "photos-2026-11-v6";
 
 const state = {
   products: loadProducts(),
@@ -29,6 +29,15 @@ const state = {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
+function normalizeCatalogCategory(category) {
+  return category === "Braceletes" ? "Pulseiras" : category;
+}
+
+function categoryMatches(product, category) {
+  if (category === "Bracelete") return product.category === "Pulseiras" || product.category === "Bracelete";
+  return product.category === category;
+}
+
 function loadProducts() {
   let saved = [];
   try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { saved = []; }
@@ -43,12 +52,14 @@ function loadProducts() {
     });
     const knownIds = new Set(saved.map((product) => product.id));
     saved = [...saved, ...seed.filter((product) => !knownIds.has(product.id))];
+    saved = saved.map((product) => ({ ...product, category: normalizeCatalogCategory(product.category) }));
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
       localStorage.setItem(SEED_VERSION_KEY, SEED_VERSION);
     } catch (error) { console.warn("Não foi possível salvar a migração do catálogo neste navegador.", error); }
   }
-  return saved.length ? saved : seed;
+  const products = saved.length ? saved : seed;
+  return products.map((product) => ({ ...product, category: normalizeCatalogCategory(product.category) }));
 }
 
 function saveProducts() {
@@ -333,7 +344,7 @@ function matchesSearch(product, query) {
 }
 
 function filteredProducts() {
-  return state.products.filter((product) => product.status === "active" && (state.catalogCategory === "all" || product.category === state.catalogCategory) && (!state.catalogSearchQuery || matchesSearch(product, state.catalogSearchQuery)));
+  return state.products.filter((product) => product.status === "active" && (state.catalogCategory === "all" || categoryMatches(product, state.catalogCategory)) && (!state.catalogSearchQuery || matchesSearch(product, state.catalogSearchQuery)));
 }
 
 function renderCatalog() {
@@ -405,7 +416,7 @@ function renderAdmin() {
   if (!isAdmin()) return;
   $("#adminGreeting").textContent = `Olá, ${state.adminName || state.adminEmail.split("@")[0]}.`;
   renderCategoryFilters();
-  const products = state.products.filter((product) => (state.adminCategory === "all" || product.category === state.adminCategory) && (!state.adminSearchQuery || matchesSearch(product, state.adminSearchQuery)));
+  const products = state.products.filter((product) => (state.adminCategory === "all" || categoryMatches(product, state.adminCategory)) && (!state.adminSearchQuery || matchesSearch(product, state.adminSearchQuery)));
   $("#statActive").textContent = state.products.filter((product) => product.status === "active").length;
   $("#statTotal").textContent = state.products.length;
   $("#adminTableBody").innerHTML = products.map((product) => `<tr><td><div class="table-product"><div class="table-thumb">${product.image ? `<img src="${escapeHtml(product.image)}" alt="" loading="lazy" decoding="async" />` : "✦"}</div><span>${escapeHtml(product.name)}<small>${escapeHtml(product.description || "Sem descrição")}</small></span></div></td><td>${escapeHtml(product.code)}</td><td>${escapeHtml(product.category)}</td><td>${formatPrice(product.price)}</td><td><span class="status-badge ${product.status}">${product.status === "active" ? "Ativo" : "Inativo"}</span></td><td><div class="row-actions"><button title="Gerenciar fotos" data-manage-photos="${product.id}">Fotos</button>${product.status === "active" ? `<button title="Gerar PDF individual" data-print-product="${product.id}">PDF</button>` : ""}<button title="Editar" data-edit-product="${product.id}">Editar</button><button title="Ativar ou desativar" data-toggle-product="${product.id}">${product.status === "active" ? "Ocultar" : "Ativar"}</button><button title="Excluir" data-delete-product="${product.id}">Excluir</button></div></td></tr>`).join("");
@@ -526,7 +537,7 @@ function parseCsv(text) {
 
 function mapImportRow(raw, index) {
   const find = (...keys) => keys.map((key) => raw[key]).find((value) => value !== undefined && value !== "") || "";
-  const code = find("codigo", "código", "sku"); const name = find("nome", "produto", "name"); const category = find("categoria", "category");
+  const code = find("codigo", "código", "sku"); const name = find("nome", "produto", "name"); const category = normalizeCatalogCategory(find("categoria", "category"));
   const duplicate = state.products.some((product) => product.code.toLowerCase() === code.toLowerCase()) || state.importRows.some((row, rowIndex) => rowIndex < index && row.code.toLowerCase() === code.toLowerCase());
   const validCategory = CATEGORIES.includes(category);
   return { id: uid(), code, name, description: find("descricao", "descrição", "description"), price: normalizePrice(find("preco", "preço", "price")), category: validCategory ? category : CATEGORIES[0], status: ["inativo", "inactive", "nao", "não"].includes(find("status").toLowerCase()) ? "inactive" : "active", image: find("imagem", "foto", "image"), duplicate, valid: Boolean(code && name && validCategory && !duplicate), issue: duplicate ? "Código duplicado" : !code || !name ? "Código e nome são obrigatórios" : !validCategory ? "Categoria inválida" : "" };
@@ -769,7 +780,7 @@ function buildCategoryPrintCatalogs() {
     const all = $("#pdfAllCategories").checked;
     const categories = all || chosen.length === CATEGORIES.length ? CATEGORIES : chosen;
     if (!categories.length) throw new Error("Selecione pelo menos uma categoria.");
-    const products = state.products.filter((product) => product.status === "active" && categories.includes(product.category));
+    const products = state.products.filter((product) => product.status === "active" && categories.some((category) => categoryMatches(product, category)));
     if (!products.length) throw new Error("Não há produtos ativos nas categorias selecionadas.");
     const doc = await createCatalogPdf(products, "Categorias selecionadas", { onProgress: progress });
     doc.save("ostenty-categorias-" + new Date().toISOString().slice(0, 10) + ".pdf");
